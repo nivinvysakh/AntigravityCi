@@ -418,3 +418,82 @@ class TestEndToEndExecution:
         assert result.summary == "Local refactor done"
         assert len(result.modified_files) == 1
         assert result.modified_files[0].path == "calc.py"
+
+    @patch("main.GitHubClient")
+    def test_pr_closed_cleans_up_bot_branch(self, mock_gh_cls, tmp_path, monkeypatch):
+        event_payload = {
+            "action": "closed",
+            "pull_request": {
+                "number": 15,
+                "merged": False,
+                "head": {"ref": "antigravityci/refactor-pr14-abc123"},
+            },
+        }
+        event_file = tmp_path / "event.json"
+        event_file.write_text(json.dumps(event_payload))
+
+        monkeypatch.setenv("GITHUB_TOKEN", "dummy_token")
+        monkeypatch.setenv("GITHUB_REPOSITORY", "nivinvysakh/AntigravityCi")
+        monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
+
+        mock_gh = MagicMock()
+        mock_gh.delete_branch.return_value = True
+        mock_gh_cls.return_value = mock_gh
+
+        ret = main()
+        assert ret == 0
+
+        mock_gh.delete_branch.assert_called_once_with("antigravityci/refactor-pr14-abc123")
+        mock_gh.create_issue_comment.assert_called_once()
+        assert "Successfully deleted branch `antigravityci/refactor-pr14-abc123`" in mock_gh.create_issue_comment.call_args[0][1]
+
+    @patch("main.GitHubClient")
+    def test_pr_closed_does_not_delete_user_branch(self, mock_gh_cls, tmp_path, monkeypatch):
+        event_payload = {
+            "action": "closed",
+            "pull_request": {
+                "number": 16,
+                "merged": False,
+                "head": {"ref": "feature/user-custom-branch"},
+            },
+        }
+        event_file = tmp_path / "event.json"
+        event_file.write_text(json.dumps(event_payload))
+
+        monkeypatch.setenv("GITHUB_TOKEN", "dummy_token")
+        monkeypatch.setenv("GITHUB_REPOSITORY", "nivinvysakh/AntigravityCi")
+        monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
+
+        mock_gh = MagicMock()
+        mock_gh_cls.return_value = mock_gh
+
+        ret = main()
+        assert ret == 0
+
+        mock_gh.delete_branch.assert_not_called()
+
+    @patch("main.GitHubClient")
+    def test_pr_opened_assigns_repo_owner(self, mock_gh_cls, tmp_path, monkeypatch):
+        event_payload = {
+            "action": "opened",
+            "pull_request": {
+                "number": 20,
+                "head": {"ref": "antigravityci/fix-pr19-xyz789"},
+                "user": {"login": "github-actions[bot]"},
+            },
+        }
+        event_file = tmp_path / "event.json"
+        event_file.write_text(json.dumps(event_payload))
+
+        monkeypatch.setenv("GITHUB_TOKEN", "dummy_token")
+        monkeypatch.setenv("GITHUB_REPOSITORY", "nivinvysakh/AntigravityCi")
+        monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
+
+        mock_gh = MagicMock()
+        mock_gh_cls.return_value = mock_gh
+
+        ret = main()
+        assert ret == 0
+
+        mock_gh.request_reviewers.assert_called_once_with(20, ["nivinvysakh"])
+        mock_gh.add_assignees.assert_called_once_with(20, ["nivinvysakh"])

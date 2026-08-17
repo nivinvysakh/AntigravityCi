@@ -170,6 +170,48 @@ class GitHubClient:
         resp.raise_for_status()
         return resp.json()
 
+    def request_reviewers(self, pr_number: int, reviewers: list[str]) -> bool:
+        """Request review from specified users on a Pull Request."""
+        if not reviewers:
+            return False
+        url = f"{self.base_url}/pulls/{pr_number}/requested_reviewers"
+        try:
+            resp = self.session.post(url, json={"reviewers": reviewers})
+            if resp.status_code in (200, 201):
+                logger.info(f"Requested review from {reviewers} on PR #{pr_number}")
+                return True
+            logger.warning(f"Could not request review on PR #{pr_number}: {resp.status_code} {resp.text}")
+        except Exception as e:
+            logger.warning(f"Failed to request review: {e}")
+        return False
+
+    def add_assignees(self, issue_number: int, assignees: list[str]) -> bool:
+        """Add assignees to a PR / Issue."""
+        if not assignees:
+            return False
+        url = f"{self.base_url}/issues/{issue_number}/assignees"
+        try:
+            resp = self.session.post(url, json={"assignees": assignees})
+            if resp.status_code in (200, 201):
+                logger.info(f"Assigned {assignees} to PR #{issue_number}")
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to add assignees: {e}")
+        return False
+
+    def delete_branch(self, branch_name: str) -> bool:
+        """Delete a remote Git branch ref."""
+        url = f"{self.base_url}/git/refs/heads/{branch_name}"
+        try:
+            resp = self.session.delete(url)
+            if resp.status_code in (200, 204):
+                logger.info(f"Deleted remote branch: {branch_name}")
+                return True
+            logger.warning(f"Could not delete branch {branch_name}: {resp.status_code} {resp.text}")
+        except Exception as e:
+            logger.warning(f"Failed to delete branch {branch_name}: {e}")
+        return False
+
 
 # ============================================================================
 # Git Helper Functions
@@ -302,7 +344,6 @@ def call_local_llama_server(
     res_json = resp.json()
     content = res_json["choices"][0]["message"]["content"]
 
-    # Clean markdown json tags if present
     content = re.sub(r"^```(?:json)?\s*", "", content.strip())
     content = re.sub(r"\s*```$", "", content)
     data = json.loads(content)
@@ -354,7 +395,6 @@ def call_ai_engine(
     system_instruction: str,
 ) -> tuple[GeminiPRResponse, str]:
     """Unified AI dispatcher supporting Local Qwen2.5-Coder and Cloud fallback."""
-    # 1. Force Local Engine
     if engine == "local" or not gemini_api_key:
         try:
             res = call_local_llama_server(prompt, system_instruction)
@@ -364,7 +404,6 @@ def call_ai_engine(
                 raise RuntimeError(f"Local LLM engine failed and no GEMINI_API_KEY provided: {local_err}")
             logger.warning(f"Local LLM failed ({local_err}), falling back to cloud Gemini...")
 
-    # 2. Cloud Gemini with Fallback Cascade
     if gemini_api_key:
         try:
             return call_gemini_cascade(gemini_api_key, model_name, prompt, system_instruction)
@@ -377,6 +416,56 @@ def call_ai_engine(
                 raise RuntimeError(f"Both Cloud Gemini and Local LLM failed: {gemini_err} | {e}")
 
     raise RuntimeError("No valid AI engine available.")
+
+
+# ============================================================================
+# Event Handlers: PR Closed (Cleanup) & PR Opened (Reviewer Assignment)
+# ============================================================================
+
+def handle_pr_closed(gh: GitHubClient, event_data: dict[str, Any]) -> int:
+    """Delete the remote branch when an AntigravityCI PR is closed / cancelled."""
+    pull_request = event_data.get("pull_request", {})
+    pr_number = pull_request.get("number")
+    head_ref = pull_request.get("head", {}).get("ref", "")
+    merged = pull_request.get("merged", False)
+
+    logger.info(f"PR #{pr_number} was closed (merged={merged}). Head branch: {head_ref}")
+
+    # Only clean up branches created by AntigravityCI
+    if head_ref.startswith("antigravityci/"):
+        logger.info(f"Cleaning up AntigravityCI branch `{head_ref}`...")
+        deleted = gh.delete_branch(head_ref)
+        if deleted:
+            cleanup_msg = (
+                f"🧹 **AntigravityCI Cleanup**: Pull Request #{pr_number} was closed. "
+                f"Successfully deleted branch `{head_ref}`."
+            )
+            gh.create_issue_comment(pr_number, cleanup_msg)
+            logger.info(f"Successfully cleaned up branch `{head_ref}`.")
+            return 0
+        else:
+            logger.warning(f"Could not delete branch `{head_ref}`.")
+    else:
+        logger.info(f"Branch `{head_ref}` is not an antigravityci branch. Skipping deletion.")
+
+    return 0
+
+
+def handle_pr_opened(gh: GitHubClient, event_data: dict[str, Any], repo_owner: str) -> int:
+    """Automatically assign repository owner to review newly opened AntigravityCI PRs."""
+    pull_request = event_data.get("pull_request", {})
+    pr_number = pull_request.get("number")
+    head_ref = pull_request.get("head", {}).get("ref", "")
+    pr_creator = pull_request.get("user", {}).get("login", "")
+
+    logger.info(f"PR #{pr_number} opened by {pr_creator} (head: {head_ref}).")
+
+    if head_ref.startswith("antigravityci/") and repo_owner:
+        logger.info(f"Assigning repo owner @{repo_owner} to review PR #{pr_number}...")
+        gh.request_reviewers(pr_number, [repo_owner])
+        gh.add_assignees(pr_number, [repo_owner])
+
+    return 0
 
 
 # ============================================================================
@@ -401,6 +490,8 @@ def main() -> int:
         logger.error("Missing GITHUB_TOKEN or GITHUB_REPOSITORY environment variable.")
         return 1
 
+    repo_owner = github_repository.split("/")[0] if "/" in github_repository else ""
+
     if not github_event_path or not os.path.isfile(github_event_path):
         logger.error(f"Event file not found at GITHUB_EVENT_PATH: {github_event_path}")
         return 1
@@ -413,11 +504,30 @@ def main() -> int:
         logger.error(f"Failed to read GitHub event data: {e}")
         return 1
 
+    gh = GitHubClient(token=github_token, repo=github_repository)
+
+    action = event_data.get("action", "")
+    pull_request = event_data.get("pull_request")
     comment = event_data.get("comment")
     issue = event_data.get("issue")
 
+    # ------------------------------------------------------------------------
+    # Event Case 1: Pull Request Closed / Cancelled -> Clean up branch
+    # ------------------------------------------------------------------------
+    if pull_request and action == "closed":
+        return handle_pr_closed(gh, event_data)
+
+    # ------------------------------------------------------------------------
+    # Event Case 2: Pull Request Opened -> Assign Repo Owner for Review
+    # ------------------------------------------------------------------------
+    if pull_request and action == "opened":
+        return handle_pr_opened(gh, event_data, repo_owner)
+
+    # ------------------------------------------------------------------------
+    # Event Case 3: Issue Comment on a PR -> Process Command
+    # ------------------------------------------------------------------------
     if not comment or not issue:
-        logger.info("Event is not an issue_comment. Skipping AntigravityCI.")
+        logger.info(f"Unhandled event action '{action}'. Skipping AntigravityCI.")
         return 0
 
     if "pull_request" not in issue:
@@ -449,8 +559,6 @@ def main() -> int:
         f"Triggered by @{comment_author} ({author_association}) on PR #{pr_number}: "
         f"command='{parsed.command}', instruction='{parsed.instruction}'"
     )
-
-    gh = GitHubClient(token=github_token, repo=github_repository)
 
     # 1. Acknowledge with thumbs-up reaction and post replay acknowledgment comment
     try:
@@ -664,6 +772,11 @@ def main() -> int:
         new_pr_number = new_pr.get("number")
         logger.info(f"Created new PR #{new_pr_number} at {new_pr_url}")
 
+        # Automatically request review from repo owner & assign
+        if repo_owner:
+            gh.request_reviewers(new_pr_number, [repo_owner])
+            gh.add_assignees(new_pr_number, [repo_owner])
+
     except Exception as e:
         logger.error(f"Failed to create new Pull Request: {e}")
         gh.create_issue_comment(
@@ -678,7 +791,8 @@ def main() -> int:
             f"### 🚀 AntigravityCI Complete!\n\n"
             f"I've processed your command (`@{bot_name.lstrip('@')} {parsed.command}`) and opened a new Pull Request:\n\n"
             f"👉 **[#{new_pr_number} - {ai_response.pr_title}]({new_pr_url})** (targeting `{target_branch}`)\n\n"
-            f"**Engine Used:** `{engine_used}`\n\n"
+            f"**Engine Used:** `{engine_used}`\n"
+            f"**Reviewer Assigned:** @{repo_owner}\n\n"
             f"**Summary of Changes:**\n"
             f"{ai_response.summary}\n\n"
             f"<details>\n<summary><b>Modified Files ({len(changed_paths)})</b></summary>\n\n"

@@ -3,16 +3,18 @@ name: AntigravityCI PR Assistant
 on:
   issue_comment:
     types: [created]
+  pull_request:
+    types: [opened, closed]
 
 jobs:
   antigravityci:
-    name: Process AntigravityCI PR Command
-    # Only run on comments in Pull Requests
-    if: ${{ github.event.issue.pull_request }}
+    name: Process AntigravityCI PR Action
+    # Only run on pull_request events or comments that belong to a PR
+    if: ${{ github.event.pull_request || github.event.issue.pull_request }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # Needed to create branches and push commits
-      pull-requests: write  # Needed to create new PRs and post comments
+      contents: write       # Needed to create/delete branches and push commits
+      pull-requests: write  # Needed to create PRs, request reviewers, post comments
       issues: write         # Needed to react and comment on PR issue threads
     steps:
       - name: Checkout Repository
@@ -23,8 +25,7 @@ jobs:
       - name: Run AntigravityCI
         uses: nivinvysakh/AntigravityCi@main
         with:
-          # Optional: If GEMINI_API_KEY is omitted, AntigravityCI runs 100% locally with embedded Qwen2.5-Coder
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          engine: "auto" # 'auto', 'local', or 'gemini'
+          engine: "auto"
           bot_name: "@antigravityci"
