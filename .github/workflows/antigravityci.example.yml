@@ -18,13 +18,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch all history so we can checkout branches cleanly
+          fetch-depth: 0
 
       - name: Run AntigravityCI
         uses: nivinvysakh/AntigravityCi@main
         with:
+          # Optional: If omitted, runs 100% offline using embedded Qwen2.5-Coder
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          model: "gemini-3.7-flash"
+          engine: "auto"
           bot_name: "@antigravityci"
-          max_file_size_kb: "50"

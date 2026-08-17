@@ -246,9 +246,9 @@ class TestEndToEndExecution:
         assert ret == 0
 
     @patch("main.GitHubClient")
-    @patch("main.call_gemini_with_retry")
+    @patch("main.call_ai_engine")
     @patch("main.run_cmd")
-    def test_successful_flow(self, mock_run_cmd, mock_call_gemini, mock_gh_cls, tmp_path, monkeypatch):
+    def test_successful_flow(self, mock_run_cmd, mock_call_ai, mock_gh_cls, tmp_path, monkeypatch):
         # Create a dummy modified file
         test_file = tmp_path / "calc.py"
         test_file.write_text("def add(a, b): return a - b", encoding="utf-8")
@@ -271,7 +271,6 @@ class TestEndToEndExecution:
         monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo")
         monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
 
-        # Mock GitHub Client instance
         mock_gh = MagicMock()
         mock_gh.get_pull_request.return_value = {
             "base": {"ref": "main"},
@@ -288,19 +287,21 @@ class TestEndToEndExecution:
         }
         mock_gh_cls.return_value = mock_gh
 
-        # Mock Gemini Response
-        mock_call_gemini.return_value = GeminiPRResponse(
-            summary="Fixed addition logic.",
-            explanation="Changed minus operator to plus in add function.",
-            pr_title="fix(calc): correct addition operator",
-            pr_body="Fixes the calculation bug.",
-            modified_files=[
-                FileModification(
-                    path=str(test_file),
-                    action="modify",
-                    content="def add(a, b): return a + b\n",
-                )
-            ],
+        mock_call_ai.return_value = (
+            GeminiPRResponse(
+                summary="Fixed addition logic.",
+                explanation="Changed minus operator to plus in add function.",
+                pr_title="fix(calc): correct addition operator",
+                pr_body="Fixes the calculation bug.",
+                modified_files=[
+                    FileModification(
+                        path=str(test_file),
+                        action="modify",
+                        content="def add(a, b): return a + b\n",
+                    )
+                ],
+            ),
+            "gemini-2.5-flash",
         )
 
         ret = main()
@@ -309,7 +310,6 @@ class TestEndToEndExecution:
         # Assertions on mocks
         mock_gh.add_comment_reaction.assert_any_call(999, "+1")
         mock_gh.create_pull_request.assert_called_once()
-        # Initial ack comment + final completion comment = 2 comments
         assert mock_gh.create_issue_comment.call_count == 2
 
         # Check initial acknowledgment replay message
@@ -320,9 +320,9 @@ class TestEndToEndExecution:
         mock_gh.add_comment_reaction.assert_any_call(999, "rocket")
 
     @patch("main.GitHubClient")
-    @patch("main.call_gemini_with_retry")
+    @patch("main.call_ai_engine")
     @patch("main.run_cmd")
-    def test_refactor_command_replays_message(self, mock_run_cmd, mock_call_gemini, mock_gh_cls, tmp_path, monkeypatch):
+    def test_refactor_command_replays_message(self, mock_run_cmd, mock_call_ai, mock_gh_cls, tmp_path, monkeypatch):
         test_file = tmp_path / "service.py"
         test_file.write_text("def run(): pass", encoding="utf-8")
 
@@ -360,18 +360,21 @@ class TestEndToEndExecution:
         }
         mock_gh_cls.return_value = mock_gh
 
-        mock_call_gemini.return_value = GeminiPRResponse(
-            summary="Optimized async loop.",
-            explanation="Used asyncio.gather.",
-            pr_title="refactor: optimize async loop",
-            pr_body="Detailed body.",
-            modified_files=[
-                FileModification(
-                    path=str(test_file),
-                    action="modify",
-                    content="async def run(): await asyncio.gather()",
-                )
-            ],
+        mock_call_ai.return_value = (
+            GeminiPRResponse(
+                summary="Optimized async loop.",
+                explanation="Used asyncio.gather.",
+                pr_title="refactor: optimize async loop",
+                pr_body="Detailed body.",
+                modified_files=[
+                    FileModification(
+                        path=str(test_file),
+                        action="modify",
+                        content="async def run(): await asyncio.gather()",
+                    )
+                ],
+            ),
+            "local-qwen2.5-coder-1.5b",
         )
 
         ret = main()
@@ -382,3 +385,36 @@ class TestEndToEndExecution:
         assert "Refactoring your code" in first_comment
         assert "@antigravityci refactor optimize this async loop" in first_comment
         assert "@senior_dev" in first_comment
+
+    @patch("requests.post")
+    def test_call_local_llama_server(self, mock_post):
+        from main import call_local_llama_server
+
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({
+                            "summary": "Local refactor done",
+                            "explanation": "Refactored offline.",
+                            "pr_title": "refactor(calc): add types",
+                            "pr_body": "Offline improvements.",
+                            "modified_files": [
+                                {
+                                    "path": "calc.py",
+                                    "action": "modify",
+                                    "content": "def add(a: int, b: int) -> int: return a + b",
+                                }
+                            ],
+                        })
+                    }
+                }
+            ]
+        }
+        mock_post.return_value = mock_resp
+
+        result = call_local_llama_server("Test prompt", "System instruction")
+        assert result.summary == "Local refactor done"
+        assert len(result.modified_files) == 1
+        assert result.modified_files[0].path == "calc.py"

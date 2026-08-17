@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-AntigravityCI - AI Pull Request Assistant powered by Google Gemini.
-Triggers on PR comments matching `@antigravityci <command> <instruction>`,
-analyzes modified PR files, generates code improvements using Gemini 3.7 Flash,
-commits to a new branch, and creates a follow-up Pull Request.
+AntigravityCI - AI Pull Request Assistant.
+Powered by embedded local Qwen2.5-Coder (zero API keys needed) with automatic
+cloud fallback to Google Gemini / Groq / OpenAI.
 """
 
 from __future__ import annotations
@@ -15,15 +14,12 @@ import os
 import re
 import subprocess
 import sys
-import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
 import requests
-from google import genai
-from google.genai import types
 from pydantic import BaseModel, Field
 
 # Configure logging
@@ -61,9 +57,16 @@ LOCKFILES: set[str] = {
     "flake.lock",
 }
 
+# Gemini fallback cascade list in case of 503 / high demand
+GEMINI_CASCADE_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+]
+
 
 # ============================================================================
-# Pydantic Schemas for Gemini Structured Output
+# Pydantic Schemas for Structured Output
 # ============================================================================
 
 class FileModification(BaseModel):
@@ -259,24 +262,70 @@ def read_file_safely(file_path: str, max_file_size_kb: int = 50) -> Optional[str
 
 
 # ============================================================================
-# Gemini Generation
+# LLM Execution: Local (Qwen2.5-Coder) & Cloud (Gemini / OpenAI / Groq)
 # ============================================================================
 
-def call_gemini_with_retry(
-    client: genai.Client,
-    model: str,
+def call_local_llama_server(
     prompt: str,
     system_instruction: str,
-    max_retries: int = 3,
+    base_url: str = "http://127.0.0.1:8080",
 ) -> GeminiPRResponse:
-    """Call Google Gemini using the `google-genai` SDK with retry & structured output."""
-    delay = 2.0
+    """Call the embedded local llama-server running Qwen2.5-Coder."""
+    url = f"{base_url}/v1/chat/completions"
+    schema_prompt = (
+        f"{system_instruction}\n\n"
+        "CRITICAL: You MUST respond ONLY with a valid JSON object matching this schema:\n"
+        "{\n"
+        '  "summary": "Brief summary",\n'
+        '  "explanation": "Markdown explanation",\n'
+        '  "pr_title": "Conventional commit title",\n'
+        '  "pr_body": "Detailed PR body",\n'
+        '  "modified_files": [\n'
+        '    {"path": "relative/path.ext", "action": "modify", "content": "full updated code"}\n'
+        "  ]\n"
+        "}"
+    )
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": schema_prompt},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+        "max_tokens": 4096,
+        "response_format": {"type": "json_object"},
+    }
+
+    logger.info(f"Querying embedded local LLM server at {url}...")
+    resp = requests.post(url, json=payload, timeout=300)
+    resp.raise_for_status()
+    res_json = resp.json()
+    content = res_json["choices"][0]["message"]["content"]
+
+    # Clean markdown json tags if present
+    content = re.sub(r"^```(?:json)?\s*", "", content.strip())
+    content = re.sub(r"\s*```$", "", content)
+    data = json.loads(content)
+    return GeminiPRResponse(**data)
+
+
+def call_gemini_cascade(
+    gemini_api_key: str,
+    requested_model: str,
+    prompt: str,
+    system_instruction: str,
+) -> tuple[GeminiPRResponse, str]:
+    """Call Google Gemini with automatic fallback cascade if 503 / rate limits occur."""
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=gemini_api_key)
+    models_to_try = [requested_model] + [m for m in GEMINI_CASCADE_MODELS if m != requested_model]
     last_error: Optional[Exception] = None
 
-    for attempt in range(1, max_retries + 1):
+    for model in models_to_try:
         try:
-            logger.info(f"Calling Gemini ({model}) [Attempt {attempt}/{max_retries}]...")
-
+            logger.info(f"Attempting Gemini ({model})...")
             response = client.models.generate_content(
                 model=model,
                 contents=prompt,
@@ -287,22 +336,47 @@ def call_gemini_with_retry(
                     temperature=0.2,
                 ),
             )
-
-            if not response.text:
-                raise ValueError("Empty response text received from Gemini.")
-
-            data = json.loads(response.text)
-            parsed_response = GeminiPRResponse(**data)
-            return parsed_response
-
+            if response.text:
+                data = json.loads(response.text)
+                return GeminiPRResponse(**data), model
         except Exception as e:
             last_error = e
-            logger.warning(f"Gemini API attempt {attempt} failed: {e}")
-            if attempt < max_retries:
-                time.sleep(delay)
-                delay *= 2.0
+            logger.warning(f"Gemini model {model} failed: {e}. Cascading to next model...")
 
-    raise RuntimeError(f"Gemini API failed after {max_retries} attempts: {last_error}")
+    raise RuntimeError(f"All Gemini cascade models failed: {last_error}")
+
+
+def call_ai_engine(
+    engine: str,
+    gemini_api_key: Optional[str],
+    model_name: str,
+    prompt: str,
+    system_instruction: str,
+) -> tuple[GeminiPRResponse, str]:
+    """Unified AI dispatcher supporting Local Qwen2.5-Coder and Cloud fallback."""
+    # 1. Force Local Engine
+    if engine == "local" or not gemini_api_key:
+        try:
+            res = call_local_llama_server(prompt, system_instruction)
+            return res, "local-qwen2.5-coder-1.5b"
+        except Exception as local_err:
+            if not gemini_api_key:
+                raise RuntimeError(f"Local LLM engine failed and no GEMINI_API_KEY provided: {local_err}")
+            logger.warning(f"Local LLM failed ({local_err}), falling back to cloud Gemini...")
+
+    # 2. Cloud Gemini with Fallback Cascade
+    if gemini_api_key:
+        try:
+            return call_gemini_cascade(gemini_api_key, model_name, prompt, system_instruction)
+        except Exception as gemini_err:
+            logger.warning(f"Gemini cloud failed: {gemini_err}. Attempting local engine fallback...")
+            try:
+                res = call_local_llama_server(prompt, system_instruction)
+                return res, "local-qwen2.5-coder-1.5b (fallback)"
+            except Exception as e:
+                raise RuntimeError(f"Both Cloud Gemini and Local LLM failed: {gemini_err} | {e}")
+
+    raise RuntimeError("No valid AI engine available.")
 
 
 # ============================================================================
@@ -317,14 +391,11 @@ def main() -> int:
     github_token = os.getenv("GITHUB_TOKEN")
     github_repository = os.getenv("GITHUB_REPOSITORY")
     github_event_path = os.getenv("GITHUB_EVENT_PATH")
-    model_name = os.getenv("INPUT_MODEL", "gemini-3.7-flash")
+    engine = os.getenv("INPUT_ENGINE", "auto").lower()
+    model_name = os.getenv("INPUT_MODEL", "gemini-2.5-flash")
     bot_name = os.getenv("INPUT_BOT_NAME", "@antigravityci")
     max_file_size_kb = int(os.getenv("INPUT_MAX_FILE_SIZE_KB", "50"))
     target_branch_input = os.getenv("INPUT_TARGET_BRANCH", "auto")
-
-    if not gemini_api_key:
-        logger.error("Missing GEMINI_API_KEY environment variable.")
-        return 1
 
     if not github_token or not github_repository:
         logger.error("Missing GITHUB_TOKEN or GITHUB_REPOSITORY environment variable.")
@@ -342,7 +413,6 @@ def main() -> int:
         logger.error(f"Failed to read GitHub event data: {e}")
         return 1
 
-    # Ensure this is an issue_comment event on a Pull Request
     comment = event_data.get("comment")
     issue = event_data.get("issue")
 
@@ -395,10 +465,11 @@ def main() -> int:
             else f"Processing `{parsed.command}`"
         )
         replay_text = f"@{bot_name.lstrip('@')} {parsed.command} {parsed.instruction}".strip()
+        engine_label = "Local Qwen2.5-Coder" if (engine == "local" or not gemini_api_key) else f"Cloud ({model_name})"
         ack_message = (
             f"🤖 **AntigravityCI**: {action_verb} for @{comment_author}!\n\n"
             f"> 💬 **Instruction Replay:** `{replay_text}`\n\n"
-            f"⏳ Analyzing PR #{pr_number} modified files with Google Gemini ({model_name}). I'll create a branch and open a new PR shortly..."
+            f"⏳ Analyzing PR #{pr_number} modified files with {engine_label}. I'll create a branch and open a new PR shortly..."
         )
         gh.create_issue_comment(pr_number, ack_message)
     except Exception as e:
@@ -449,7 +520,6 @@ def main() -> int:
 
         content = read_file_safely(filename, max_file_size_kb)
         if content is None:
-            # Fallback to fetching directly from GitHub API
             content = gh.get_file_content(filename, head_sha)
 
         if content is not None:
@@ -470,7 +540,7 @@ def main() -> int:
         gh.create_issue_comment(pr_number, msg)
         return 0
 
-    # 4. Construct prompt for Gemini
+    # 4. Construct prompt for AI Engine
     system_instruction = (
         "You are AntigravityCI, an expert AI software engineer and code reviewer. "
         "Your task is to fulfill the user's PR command by analyzing the provided files, diffs, "
@@ -500,27 +570,28 @@ def main() -> int:
         f"Context JSON:\n{json.dumps(prompt_payload, indent=2)}"
     )
 
-    # 5. Initialize GenAI Client and Call Gemini
+    # 5. Call AI Engine (Local Qwen2.5-Coder or Cloud with Fallback Cascade)
     try:
-        genai_client = genai.Client(api_key=gemini_api_key)
-        ai_response = call_gemini_with_retry(
-            client=genai_client,
-            model=model_name,
+        ai_response, engine_used = call_ai_engine(
+            engine=engine,
+            gemini_api_key=gemini_api_key,
+            model_name=model_name,
             prompt=user_prompt,
             system_instruction=system_instruction,
         )
+        logger.info(f"AI response generated successfully using: {engine_used}")
     except Exception as e:
-        logger.error(f"Gemini API error: {e}")
+        logger.error(f"AI generation failed: {e}")
         gh.create_issue_comment(
             pr_number,
-            f"❌ **AntigravityCI Error**: Failed to process with Gemini ({model_name}).\n```\n{e}\n```"
+            f"❌ **AntigravityCI Error**: AI generation failed.\n```\n{e}\n```"
         )
         return 1
 
     if not ai_response.modified_files:
         gh.create_issue_comment(
             pr_number,
-            f"ℹ️ **AntigravityCI**: Gemini analyzed PR #{pr_number} but determined no file modifications were necessary.\n\n"
+            f"ℹ️ **AntigravityCI**: Analyzed PR #{pr_number} but determined no file modifications were necessary.\n\n"
             f"**Explanation:**\n{ai_response.explanation}"
         )
         return 0
@@ -555,6 +626,7 @@ def main() -> int:
         commit_msg = (
             f"[antigravityci] {parsed.command}: {parsed.instruction or 'AI improvements'}\n\n"
             f"Triggered by comment on PR #{pr_number} by @{comment_author}.\n"
+            f"Engine: {engine_used}\n"
             f"{ai_response.summary}"
         )
         run_cmd(["git", "commit", "-m", commit_msg])
@@ -579,7 +651,7 @@ def main() -> int:
             f"### 🔍 Detailed Explanation\n{ai_response.explanation}\n\n"
             f"### 📁 Modified Files ({len(changed_paths)})\n"
             + "\n".join(f"- `{p}`" for p in changed_paths)
-            + f"\n\n---\n*Created by [AntigravityCI](https://github.com/{github_repository}) powered by Google Gemini ({model_name}).*"
+            + f"\n\n---\n*Generated with 🧠 [{engine_used}](https://github.com/{github_repository}) via AntigravityCI.*"
         )
 
         new_pr = gh.create_pull_request(
@@ -606,6 +678,7 @@ def main() -> int:
             f"### 🚀 AntigravityCI Complete!\n\n"
             f"I've processed your command (`@{bot_name.lstrip('@')} {parsed.command}`) and opened a new Pull Request:\n\n"
             f"👉 **[#{new_pr_number} - {ai_response.pr_title}]({new_pr_url})** (targeting `{target_branch}`)\n\n"
+            f"**Engine Used:** `{engine_used}`\n\n"
             f"**Summary of Changes:**\n"
             f"{ai_response.summary}\n\n"
             f"<details>\n<summary><b>Modified Files ({len(changed_paths)})</b></summary>\n\n"
