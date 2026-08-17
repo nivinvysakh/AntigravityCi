@@ -1,0 +1,30 @@
+name: AntigravityCI PR Assistant
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  antigravityci:
+    name: Process AntigravityCI PR Command
+    # Only run on comments in Pull Requests
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # Needed to create branches and push commits
+      pull-requests: write  # Needed to create new PRs and post comments
+      issues: write         # Needed to react and comment on PR issue threads
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history so we can checkout branches cleanly
+
+      - name: Run AntigravityCI
+        uses: nivinvysakh/AntigravityCi@main
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          model: "gemini-3.7-flash"
+          bot_name: "@antigravityci"
+          max_file_size_kb: "50"

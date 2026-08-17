@@ -8,6 +8,7 @@ commits to a new branch, and creates a follow-up Pull Request.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -18,7 +19,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import requests
 from google import genai
@@ -34,10 +35,10 @@ logging.basicConfig(
 logger = logging.getLogger("antigravityci")
 
 # Security: Allowed GitHub author associations
-AUTHORIZED_ROLES: Set[str] = {"OWNER", "MEMBER", "COLLABORATOR"}
+AUTHORIZED_ROLES: set[str] = {"OWNER", "MEMBER", "COLLABORATOR"}
 
 # Safety: Extensions to treat as binary
-BINARY_EXTENSIONS: Set[str] = {
+BINARY_EXTENSIONS: set[str] = {
     ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp", ".bmp", ".tiff",
     ".pdf", ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar", ".exe", ".bin",
     ".dll", ".so", ".dylib", ".woff", ".woff2", ".eot", ".ttf", ".otf",
@@ -46,7 +47,7 @@ BINARY_EXTENSIONS: Set[str] = {
 }
 
 # Safety: Lockfiles and generated files to ignore (all lowercase)
-LOCKFILES: Set[str] = {
+LOCKFILES: set[str] = {
     "package-lock.json",
     "pnpm-lock.yaml",
     "yarn.lock",
@@ -76,7 +77,7 @@ class GeminiPRResponse(BaseModel):
     explanation: str = Field(description="Detailed markdown explanation of the improvements made and rationale.")
     pr_title: str = Field(description="Conventional commit style PR title (e.g. 'refactor(api): optimize async request loop')")
     pr_body: str = Field(description="Complete markdown description for the new Pull Request.")
-    modified_files: List[FileModification] = Field(description="List of files to modify, create, or delete.")
+    modified_files: list[FileModification] = Field(description="List of files to modify, create, or delete.")
 
 
 # ============================================================================
@@ -97,16 +98,16 @@ class GitHubClient:
             "User-Agent": "AntigravityCI-Bot",
         })
 
-    def get_pull_request(self, pr_number: int) -> Dict[str, Any]:
+    def get_pull_request(self, pr_number: int) -> dict[str, Any]:
         """Fetch Pull Request details."""
         url = f"{self.base_url}/pulls/{pr_number}"
         resp = self.session.get(url)
         resp.raise_for_status()
         return resp.json()
 
-    def get_pr_files(self, pr_number: int) -> List[Dict[str, Any]]:
+    def get_pr_files(self, pr_number: int) -> list[dict[str, Any]]:
         """Fetch all files modified in the Pull Request with pagination."""
-        files: List[Dict[str, Any]] = []
+        files: list[dict[str, Any]] = []
         page = 1
         while True:
             url = f"{self.base_url}/pulls/{pr_number}/files?page={page}&per_page=100"
@@ -119,6 +120,19 @@ class GitHubClient:
             page += 1
         return files
 
+    def get_file_content(self, path: str, ref: str) -> Optional[str]:
+        """Fetch raw file content from GitHub API if not available locally."""
+        url = f"{self.base_url}/contents/{path}?ref={ref}"
+        try:
+            resp = self.session.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("encoding") == "base64" and "content" in data:
+                    return base64.b64decode(data["content"]).decode("utf-8")
+        except Exception as e:
+            logger.warning(f"Failed to fetch content for {path} at {ref} from GitHub API: {e}")
+        return None
+
     def add_comment_reaction(self, comment_id: int, reaction: str = "+1") -> bool:
         """Add emoji reaction to an issue/PR comment."""
         url = f"{self.base_url}/issues/comments/{comment_id}/reactions"
@@ -129,7 +143,7 @@ class GitHubClient:
         logger.warning(f"Failed to react to comment {comment_id}: {resp.status_code} {resp.text}")
         return False
 
-    def create_issue_comment(self, issue_number: int, body: str) -> Optional[Dict[str, Any]]:
+    def create_issue_comment(self, issue_number: int, body: str) -> Optional[dict[str, Any]]:
         """Post a comment on a PR / Issue."""
         url = f"{self.base_url}/issues/{issue_number}/comments"
         resp = self.session.post(url, json={"body": body})
@@ -140,7 +154,7 @@ class GitHubClient:
 
     def create_pull_request(
         self, title: str, body: str, head: str, base: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a new Pull Request."""
         url = f"{self.base_url}/pulls"
         payload = {
@@ -158,7 +172,7 @@ class GitHubClient:
 # Git Helper Functions
 # ============================================================================
 
-def run_cmd(cmd: List[str], check: bool = True, cwd: Optional[str] = None) -> subprocess.CompletedProcess:
+def run_cmd(cmd: list[str], check: bool = True, cwd: Optional[str] = None) -> subprocess.CompletedProcess:
     """Run a shell command safely."""
     logger.debug(f"Running: {' '.join(cmd)}")
     res = subprocess.run(
@@ -204,25 +218,26 @@ def parse_comment_command(body: str, bot_name: str = "@antigravityci") -> Option
     return ParsedCommand(bot_name=bot_name, command=cmd, instruction=instruction)
 
 
-def is_safe_text_file(filename: str, size_bytes: int, max_file_size_kb: int = 50) -> tuple[bool, str]:
+def is_safe_text_file(filename: str, size_bytes: int = 0, max_file_size_kb: int = 50) -> tuple[bool, str]:
     """
     Check if a file is safe for LLM context (not binary, not lockfile, not oversized).
     """
     path = Path(filename)
-    
+
     # 1. Lockfiles
     if path.name.lower() in LOCKFILES:
         return False, f"Ignored lockfile: {path.name}"
-    
+
     # 2. Binary extension
     if path.suffix.lower() in BINARY_EXTENSIONS:
         return False, f"Ignored binary file extension: {path.suffix}"
-    
-    # 3. Oversized check
-    max_bytes = max_file_size_kb * 1024
-    if size_bytes > max_bytes:
-        return False, f"Ignored oversized file ({size_bytes / 1024:.1f}KB > {max_file_size_kb}KB)"
-    
+
+    # 3. Oversized check (if size is known)
+    if size_bytes > 0:
+        max_bytes = max_file_size_kb * 1024
+        if size_bytes > max_bytes:
+            return False, f"Ignored oversized file ({size_bytes / 1024:.1f}KB > {max_file_size_kb}KB)"
+
     return True, "Safe"
 
 
@@ -261,7 +276,7 @@ def call_gemini_with_retry(
     for attempt in range(1, max_retries + 1):
         try:
             logger.info(f"Calling Gemini ({model}) [Attempt {attempt}/{max_retries}]...")
-            
+
             response = client.models.generate_content(
                 model=model,
                 contents=prompt,
@@ -272,10 +287,10 @@ def call_gemini_with_retry(
                     temperature=0.2,
                 ),
             )
-            
+
             if not response.text:
                 raise ValueError("Empty response text received from Gemini.")
-            
+
             data = json.loads(response.text)
             parsed_response = GeminiPRResponse(**data)
             return parsed_response
@@ -392,10 +407,11 @@ def main() -> int:
     # 2. Fetch PR details and modified files
     try:
         pr_info = gh.get_pull_request(pr_number)
-        base_branch = pr_info["base"]["ref"]
-        head_branch = pr_info["head"]["ref"]
-        pr_title = pr_info["title"]
-        pr_author = pr_info["user"]["login"]
+        base_branch = pr_info.get("base", {}).get("ref", "main")
+        head_branch = pr_info.get("head", {}).get("ref", "head")
+        head_sha = pr_info.get("head", {}).get("sha", "")
+        pr_title = pr_info.get("title", f"PR #{pr_number}")
+        pr_author = pr_info.get("user", {}).get("login", "unknown")
         target_branch = base_branch if target_branch_input == "auto" else target_branch_input
 
         pr_files_raw = gh.get_pr_files(pr_number)
@@ -407,24 +423,35 @@ def main() -> int:
         )
         return 1
 
+    # Fetch and checkout PR branch so workspace has the modified PR files locally
+    try:
+        run_cmd(["git", "fetch", "origin", f"pull/{pr_number}/head:pr-{pr_number}"])
+        run_cmd(["git", "checkout", f"pr-{pr_number}"])
+        logger.info(f"Checked out PR #{pr_number} branch locally.")
+    except Exception as e:
+        logger.warning(f"Could not checkout PR branch via Git: {e}. Falling back to GitHub API for file contents.")
+
     # 3. Filter files and collect context
-    files_context: List[Dict[str, str]] = []
-    ignored_files_log: List[str] = []
+    files_context: list[dict[str, str]] = []
+    ignored_files_log: list[str] = []
 
     for f_meta in pr_files_raw:
         filename = f_meta.get("filename")
         status = f_meta.get("status")
-        changes = f_meta.get("changes", 0)
 
         if status == "removed":
             continue
 
-        safe, reason = is_safe_text_file(filename, f_meta.get("raw_url_size", 0), max_file_size_kb)
+        safe, reason = is_safe_text_file(filename, 0, max_file_size_kb)
         if not safe:
             ignored_files_log.append(f"`{filename}` ({reason})")
             continue
 
         content = read_file_safely(filename, max_file_size_kb)
+        if content is None:
+            # Fallback to fetching directly from GitHub API
+            content = gh.get_file_content(filename, head_sha)
+
         if content is not None:
             files_context.append({
                 "path": filename,
@@ -439,7 +466,7 @@ def main() -> int:
             f"(all files were binary, lockfiles, deleted, or >{max_file_size_kb}KB)."
         )
         if ignored_files_log:
-            msg += f"\n\n**Ignored Files:**\n- " + "\n- ".join(ignored_files_log)
+            msg += "\n\n**Ignored Files:**\n- " + "\n- ".join(ignored_files_log)
         gh.create_issue_comment(pr_number, msg)
         return 0
 
@@ -506,11 +533,11 @@ def main() -> int:
     try:
         setup_git_user()
 
-        # Checkout and create new branch
+        # Checkout and create new branch from the current PR checkout
         run_cmd(["git", "checkout", "-b", new_branch_name])
 
         # Write files
-        changed_paths: List[str] = []
+        changed_paths: list[str] = []
         for mod in ai_response.modified_files:
             file_path = Path(mod.path)
             if mod.action == "delete":

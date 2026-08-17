@@ -5,16 +5,13 @@ and the full end-to-end execution flow using mocks.
 """
 
 import json
-import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from main import (
     AUTHORIZED_ROLES,
-    GeminiPRResponse,
     FileModification,
-    GitHubClient,
+    GeminiPRResponse,
     is_safe_text_file,
     main,
     parse_comment_command,
@@ -163,14 +160,14 @@ class TestSafeFileReader:
     def test_read_existing_valid_file(self, tmp_path):
         test_file = tmp_path / "sample.py"
         test_file.write_text("print('hello world')", encoding="utf-8")
-        
+
         content = read_file_safely(str(test_file), max_file_size_kb=50)
         assert content == "print('hello world')"
 
     def test_read_oversized_file(self, tmp_path):
         test_file = tmp_path / "large.py"
         test_file.write_text("a" * (60 * 1024), encoding="utf-8")
-        
+
         content = read_file_safely(str(test_file), max_file_size_kb=50)
         assert content is None
 
@@ -314,12 +311,12 @@ class TestEndToEndExecution:
         mock_gh.create_pull_request.assert_called_once()
         # Initial ack comment + final completion comment = 2 comments
         assert mock_gh.create_issue_comment.call_count == 2
-        
+
         # Check initial acknowledgment replay message
         first_comment = mock_gh.create_issue_comment.call_args_list[0][0][1]
         assert "Processing `fix`" in first_comment or "AntigravityCI" in first_comment
         assert "@antigravityci fix addition bug" in first_comment
-        
+
         mock_gh.add_comment_reaction.assert_any_call(999, "rocket")
 
     @patch("main.GitHubClient")
