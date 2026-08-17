@@ -1,0 +1,59 @@
+name: "AntigravityCI"
+description: "AI PR assistant powered by Google Gemini (Gemini 2.5 Flash). Triggers on PR comments like '@antigravityci refactor' or '@antigravityci fix'."
+author: "Antigravity Team"
+branding:
+  icon: "cpu"
+  color: "purple"
+
+inputs:
+  gemini_api_key:
+    description: "Google Gemini API Key"
+    required: true
+  github_token:
+    description: "GitHub Token for API operations (creating reactions, branches, comments, PRs)"
+    required: false
+    default: "${{ github.token }}"
+  model:
+    description: "Gemini Model name to use"
+    required: false
+    default: "gemini-2.5-flash"
+  bot_name:
+    description: "Trigger handle for the bot in comments"
+    required: false
+    default: "@antigravityci"
+  max_file_size_kb:
+    description: "Maximum file size in KB to send to the model context (safety filter)"
+    required: false
+    default: "50"
+  target_branch:
+    description: "Target branch for newly generated PRs ('auto' targets original PR base)"
+    required: false
+    default: "auto"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: "pip"
+        cache-dependency-path: "${{ github.action_path }}/requirements.txt"
+
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r "${{ github.action_path }}/requirements.txt"
+
+    - name: Run AntigravityCI PR Assistant
+      shell: bash
+      env:
+        GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_BOT_NAME: ${{ inputs.bot_name }}
+        INPUT_MAX_FILE_SIZE_KB: ${{ inputs.max_file_size_kb }}
+        INPUT_TARGET_BRANCH: ${{ inputs.target_branch }}
+      run: |
+        python "${{ github.action_path }}/main.py"
