@@ -21,7 +21,7 @@ inputs:
   model:
     description: "Gemini Model name to use when running in cloud mode (with automatic cascade fallback)"
     required: false
-    default: "gemini-2.5-flash"
+    default: "gemini-3.6-flash"
   bot_name:
     description: "Trigger handle for the bot in comments"
     required: false

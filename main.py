@@ -57,11 +57,11 @@ LOCKFILES: set[str] = {
     "flake.lock",
 }
 
-# Gemini fallback cascade list in case of 503 / high demand
+# Gemini fallback cascade list (using latest available models)
 GEMINI_CASCADE_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-2.0-flash-exp",
 ]
 
 
@@ -392,7 +392,7 @@ def main() -> int:
     github_repository = os.getenv("GITHUB_REPOSITORY")
     github_event_path = os.getenv("GITHUB_EVENT_PATH")
     engine = os.getenv("INPUT_ENGINE", "auto").lower()
-    model_name = os.getenv("INPUT_MODEL", "gemini-2.5-flash")
+    model_name = os.getenv("INPUT_MODEL", "gemini-3.6-flash")
     bot_name = os.getenv("INPUT_BOT_NAME", "@antigravityci")
     max_file_size_kb = int(os.getenv("INPUT_MAX_FILE_SIZE_KB", "50"))
     target_branch_input = os.getenv("INPUT_TARGET_BRANCH", "auto")

@@ -14,6 +14,8 @@ if [ "$ENGINE" = "local" ] || [ -z "$GEMINI_KEY" ] || [ "$ENGINE" = "auto" ]; th
     START_LOCAL="true"
 fi
 
+SERVER_PID=""
+
 if [ "$START_LOCAL" = "true" ] && [ -f "/app/models/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf" ] && [ -f "/app/llama-server" ]; then
     echo "🧠 [AntigravityCI] Starting embedded local Qwen2.5-Coder-1.5B server..."
     /app/llama-server \
@@ -34,6 +36,11 @@ if [ "$START_LOCAL" = "true" ] && [ -f "/app/models/qwen2.5-coder-1.5b-instruct-
         fi
         sleep 1
     done
+
+    if ! curl -s http://127.0.0.1:8080/health > /dev/null 2>&1; then
+        echo "⚠️ Local llama-server failed to start. Logs:"
+        cat /tmp/llama.log 2>/dev/null || true
+    fi
 fi
 
 # Run the AntigravityCI Python assistant
