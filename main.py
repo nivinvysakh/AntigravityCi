@@ -200,16 +200,29 @@ class GitHubClient:
         return False
 
     def delete_branch(self, branch_name: str) -> bool:
-        """Delete a remote Git branch ref."""
+        """Delete a remote Git branch ref using GitHub API with Git CLI fallback."""
         url = f"{self.base_url}/git/refs/heads/{branch_name}"
         try:
             resp = self.session.delete(url)
             if resp.status_code in (200, 204):
-                logger.info(f"Deleted remote branch: {branch_name}")
+                logger.info(f"Deleted remote branch via API: {branch_name}")
                 return True
-            logger.warning(f"Could not delete branch {branch_name}: {resp.status_code} {resp.text}")
+            logger.warning(
+                f"API delete ref failed for {branch_name}: {resp.status_code} {resp.text}. Trying git CLI..."
+            )
         except Exception as e:
-            logger.warning(f"Failed to delete branch {branch_name}: {e}")
+            logger.warning(f"Failed to delete branch via API: {e}. Trying git CLI...")
+
+        # Fallback to Git CLI push --delete
+        try:
+            res = run_cmd(["git", "push", "origin", "--delete", branch_name], check=False)
+            if res.returncode == 0:
+                logger.info(f"Deleted remote branch via Git CLI: {branch_name}")
+                return True
+            logger.warning(f"Git CLI push --delete failed: {res.stderr}")
+        except Exception as e:
+            logger.warning(f"Git CLI delete failed: {e}")
+
         return False
 
 
