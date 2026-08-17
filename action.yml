@@ -1,5 +1,5 @@
 name: "AntigravityCI"
-description: "AI PR assistant powered by Google Gemini (Gemini 2.5 Flash). Triggers on PR comments like '@antigravityci refactor' or '@antigravityci fix'."
+description: "AI PR assistant powered by Google Gemini (Gemini 3.7 Flash). Triggers on PR comments like '@antigravityci refactor' or '@antigravityci fix'."
 author: "Antigravity Team"
 branding:
   icon: "cpu"
@@ -16,7 +16,7 @@ inputs:
   model:
     description: "Gemini Model name to use"
     required: false
-    default: "gemini-2.5-flash"
+    default: "gemini-3.7-flash"
   bot_name:
     description: "Trigger handle for the bot in comments"
     required: false

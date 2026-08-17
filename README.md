@@ -1,11 +1,11 @@
 # AntigravityCI 🚀
 
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Composite-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
-[![Google Gemini](https://img.shields.io/badge/Powered%20by-Google%20Gemini%202.5%20Flash-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
+[![Google Gemini](https://img.shields.io/badge/Powered%20by-Google%20Gemini%203.7%20Flash-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**AntigravityCI** is an open-source, AI-powered GitHub Action that acts as an intelligent PR assistant directly inside your Pull Request comments. Powered by **Google Gemini 2.5 Flash** and the official `google-genai` SDK, it understands your repository's context, refactors code, fixes bugs, adds unit tests, and opens clean follow-up Pull Requests on demand.
+**AntigravityCI** is an open-source, AI-powered GitHub Action that acts as an intelligent PR assistant directly inside your Pull Request comments. Powered by **Google Gemini 3.7 Flash** and the official `google-genai` SDK, it understands your repository's context, refactors code, fixes bugs, adds unit tests, and opens clean follow-up Pull Requests on demand.
 
 ---
 
@@ -18,7 +18,7 @@ PR Comment:
 AntigravityCI:
   👍 Reacts with +1 to acknowledge receipt
   💬 Replies immediately with instruction replay acknowledging the refactoring request
-  🧠 Analyzes modified PR files and diff context with Gemini 2.5 Flash
+  🧠 Analyzes modified PR files and diff context with Gemini 3.7 Flash
   🌿 Creates branch: antigravityci/refactor-pr42-a8f9
   📝 Commits code & pushes to origin
   🚀 Opens Pull Request #43 targeting `main`
@@ -32,8 +32,8 @@ AntigravityCI:
 ## ✨ Features
 
 - **💬 Comment-Driven Trigger**: Mention `@antigravityci <command> <instruction>` on any PR comment to trigger the assistant.
-- **⚡ Instant Feedback**: Automatically acknowledges requests with a 👍 emoji reaction on the trigger comment and a 🚀 reaction upon completion.
-- **🧠 Google Gemini 2.5 Flash**: Utilizes the official `google-genai` Python SDK with structured Pydantic response schemas for deterministic, parseable, and high-fidelity code modifications.
+- **⚡ Instant Feedback**: Automatically acknowledges requests with a 👍 emoji reaction and an immediate acknowledgment comment replaying the instruction, followed by a 🚀 reaction on completion.
+- **🧠 Google Gemini 3.7 Flash**: Utilizes the official `google-genai` Python SDK with structured Pydantic response schemas for deterministic, parseable, and high-fidelity code modifications.
 - **🛡️ Built-in Security Authorization**: Enforces strict role checks—only repository `OWNER`, `MEMBER`, and `COLLABORATOR` roles can trigger workflows, preventing unauthorized usage or prompt injection.
 - **🔒 Safety File Filters**: Automatically ignores lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `poetry.lock`, `Cargo.lock`, etc.), binary assets (images, fonts, archives), and oversized files (>50KB).
 - **🌿 Dedicated Branch & PR Creation**: Keeps your commit history clean by generating dedicated branches (`antigravityci/<command>-pr<number>-<short-id>`) and opening a linked PR targeting your base branch.
@@ -76,11 +76,11 @@ jobs:
           fetch-depth: 0
 
       - name: Run AntigravityCI
-        uses: your-org/antigravityci@v1
+        uses: nivinvysakh/AntigravityCi@main
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          model: "gemini-2.5-flash"
+          model: "gemini-3.7-flash"
           bot_name: "@antigravityci"
 ```
 
@@ -106,7 +106,7 @@ You can tag AntigravityCI in any PR comment with any custom command and instruct
 |---|---|:---:|:---:|
 | `gemini_api_key` | Google Gemini API Key | **Yes** | — |
 | `github_token` | GitHub token for git & API operations | No | `${{ github.token }}` |
-| `model` | Gemini model name (e.g. `gemini-2.5-flash`, `gemini-2.5-pro`) | No | `gemini-2.5-flash` |
+| `model` | Gemini model name (e.g. `gemini-3.7-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`) | No | `gemini-3.7-flash` |
 | `bot_name` | Comment trigger handle | No | `@antigravityci` |
 | `max_file_size_kb` | Max individual file size in KB sent to LLM context | No | `50` |
 | `target_branch` | Target branch for generated PR (`auto` uses base of PR) | No | `auto` |
@@ -121,12 +121,12 @@ sequenceDiagram
     actor Collaborator as Collaborator (Owner/Member)
     participant GH as GitHub PR / Actions
     participant Action as AntigravityCI (main.py)
-    participant Gemini as Google Gemini 2.5 Flash
+    participant Gemini as Google Gemini 3.7 Flash
 
     Collaborator->>GH: Comment: "@antigravityci refactor optimize query"
     GH->>Action: Trigger issue_comment workflow
     Action->>GH: Verify author role (OWNER/MEMBER/COLLABORATOR)
-    Action->>GH: Add "+1" 👍 emoji reaction to comment
+    Action->>GH: Add "+1" 👍 emoji reaction & reply with instruction replay
     Action->>GH: Fetch modified PR files (excluding lockfiles/binary/>50KB)
     Action->>Gemini: Send files context + prompt (via google-genai SDK)
     Gemini-->>Action: Return structured Pydantic response (modified_files, summary, pr_body)

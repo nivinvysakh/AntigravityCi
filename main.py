@@ -2,7 +2,7 @@
 """
 AntigravityCI - AI Pull Request Assistant powered by Google Gemini.
 Triggers on PR comments matching `@antigravityci <command> <instruction>`,
-analyzes modified PR files, generates code improvements using Gemini 2.5 Flash,
+analyzes modified PR files, generates code improvements using Gemini 3.7 Flash,
 commits to a new branch, and creates a follow-up Pull Request.
 """
 
@@ -302,7 +302,7 @@ def main() -> int:
     github_token = os.getenv("GITHUB_TOKEN")
     github_repository = os.getenv("GITHUB_REPOSITORY")
     github_event_path = os.getenv("GITHUB_EVENT_PATH")
-    model_name = os.getenv("INPUT_MODEL", "gemini-2.5-flash")
+    model_name = os.getenv("INPUT_MODEL", "gemini-3.7-flash")
     bot_name = os.getenv("INPUT_BOT_NAME", "@antigravityci")
     max_file_size_kb = int(os.getenv("INPUT_MAX_FILE_SIZE_KB", "50"))
     target_branch_input = os.getenv("INPUT_TARGET_BRANCH", "auto")
