@@ -46,11 +46,11 @@ jobs:
               return;
             }
 
-            // Case-insensitive regex match for bot tag
+            // Case-insensitive regex match for bot tag (@antigravity or @antigravityci)
             const body = comment.body.trim();
-            const match = body.match(/@antigravityci\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?/i);
+            const match = body.match(/@antigravity(?:ci)?\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?/i);
             if (!match) {
-              console.log('Comment does not contain @antigravityci command. Skipping.');
+              console.log('Comment does not contain @antigravity / @antigravityci command. Skipping.');
               return;
             }
 
