@@ -1,4 +1,4 @@
 google-genai>=0.1.1
 pydantic>=2.13.4
 requests>=2.31.0
-pytest>=8.0.0
+pytest>=9.1.1
