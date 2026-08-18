@@ -233,7 +233,7 @@ class TestEndToEndExecution:
 
     def test_non_pr_issue_ignored(self, tmp_path, monkeypatch):
         event_payload = {
-            "issue": {"number": 10}, # No pull_request key
+            "issue": {"number": 10},  # No pull_request key
             "comment": {
                 "id": 12345,
                 "body": "@antigravityci fix something",
@@ -402,19 +402,21 @@ class TestEndToEndExecution:
             "choices": [
                 {
                     "message": {
-                        "content": json.dumps({
-                            "summary": "Local refactor done",
-                            "explanation": "Refactored offline.",
-                            "pr_title": "refactor(calc): add types",
-                            "pr_body": "Offline improvements.",
-                            "modified_files": [
-                                {
-                                    "path": "calc.py",
-                                    "action": "modify",
-                                    "content": "def add(a: int, b: int) -> int: return a + b",
-                                }
-                            ],
-                        })
+                        "content": json.dumps(
+                            {
+                                "summary": "Local refactor done",
+                                "explanation": "Refactored offline.",
+                                "pr_title": "refactor(calc): add types",
+                                "pr_body": "Offline improvements.",
+                                "modified_files": [
+                                    {
+                                        "path": "calc.py",
+                                        "action": "modify",
+                                        "content": "def add(a: int, b: int) -> int: return a + b",
+                                    }
+                                ],
+                            }
+                        )
                     }
                 }
             ]
@@ -452,7 +454,10 @@ class TestEndToEndExecution:
 
         mock_gh.delete_branch.assert_called_once_with("antigravityci/refactor-pr14-abc123")
         mock_gh.create_issue_comment.assert_called_once()
-        assert "Successfully deleted branch `antigravityci/refactor-pr14-abc123`" in mock_gh.create_issue_comment.call_args[0][1]
+        assert (
+            "Successfully deleted branch `antigravityci/refactor-pr14-abc123`"
+            in mock_gh.create_issue_comment.call_args[0][1]
+        )
 
     @patch("main.GitHubClient")
     def test_pr_closed_does_not_delete_user_branch(self, mock_gh_cls, tmp_path, monkeypatch):
