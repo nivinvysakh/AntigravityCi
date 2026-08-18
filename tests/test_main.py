@@ -393,40 +393,17 @@ class TestEndToEndExecution:
         assert "@antigravityci refactor optimize this async loop" in first_comment
         assert "@senior_dev" in first_comment
 
-    @patch("requests.post")
-    def test_call_local_llama_server(self, mock_post):
-        from main import call_local_llama_server
+    def test_call_ai_engine_missing_key_raises(self):
+        from main import call_ai_engine
+        import pytest
 
-        mock_resp = MagicMock()
-        mock_resp.json.return_value = {
-            "choices": [
-                {
-                    "message": {
-                        "content": json.dumps(
-                            {
-                                "summary": "Local refactor done",
-                                "explanation": "Refactored offline.",
-                                "pr_title": "refactor(calc): add types",
-                                "pr_body": "Offline improvements.",
-                                "modified_files": [
-                                    {
-                                        "path": "calc.py",
-                                        "action": "modify",
-                                        "content": "def add(a: int, b: int) -> int: return a + b",
-                                    }
-                                ],
-                            }
-                        )
-                    }
-                }
-            ]
-        }
-        mock_post.return_value = mock_resp
-
-        result = call_local_llama_server("Test prompt", "System instruction")
-        assert result.summary == "Local refactor done"
-        assert len(result.modified_files) == 1
-        assert result.modified_files[0].path == "calc.py"
+        with pytest.raises(ValueError, match="Missing GEMINI_API_KEY"):
+            call_ai_engine(
+                gemini_api_key=None,
+                model_name="gemini-3.6-flash",
+                prompt="Test prompt",
+                system_instruction="System instruction",
+            )
 
     @patch("main.GitHubClient")
     def test_pr_closed_cleans_up_bot_branch(self, mock_gh_cls, tmp_path, monkeypatch):
