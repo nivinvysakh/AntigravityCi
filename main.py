@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-AntigravityCI - AI Pull Request Assistant.
-Powered by embedded local Qwen2.5-Coder (zero API keys needed) with automatic
-cloud fallback to Google Gemini / Groq / OpenAI.
+AntigravityCI - Autonomous AI Pull Request Assistant.
+Powered by Google Gemini ♊ with automated multi-model cascade fallbacks.
 """
 
 from __future__ import annotations
