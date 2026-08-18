@@ -556,6 +556,12 @@ def main() -> int:
     comment_author = comment.get("user", {}).get("login", "unknown")
     comment_html_url = comment.get("html_url", "")
 
+    # Ignore bot-authored comments to prevent infinite loops / duplicate triggers
+    comment_author_type = comment.get("user", {}).get("type", "")
+    if comment_author_type == "Bot" or comment_author.endswith("[bot]") or comment_author == "antigravityci":
+        logger.info(f"Comment author '{comment_author}' is a bot. Ignoring to prevent self-trigger loop.")
+        return 0
+
     # Security check: Author association
     if author_association not in AUTHORIZED_ROLES:
         logger.warning(
