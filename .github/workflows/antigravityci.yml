@@ -99,7 +99,7 @@ jobs:
         uses: nivinvysakh/AntigravityCi@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}  # Optional (runs locally on CPU if omitted)
-          engine: "auto"
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          model: "gemini-3.6-flash"
           bot_name: "@antigravityci"
           post_ack: "false"
