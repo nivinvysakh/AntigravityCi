@@ -61,28 +61,129 @@ on:
     types: [created]
 
 jobs:
-  antigravityci:
-    name: Run AntigravityCI
-    # Ensure this only runs on Pull Request comments
-    if: ${{ github.event.issue.pull_request }}
+  # ==========================================================================
+  # Job 1: Instant Acknowledgment (<2s)
+  # Reacts with 👍 (+1) and posts the instruction replay comment immediately.
+  # ==========================================================================
+  acknowledge:
+    name: Instant Acknowledgment
+    # Fast skip (0s): Only runs if the comment contains antigravity / AntiGravity
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && github.actor != 'antigravityci' && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # Push branch and commit code
-      pull-requests: write  # Open new PR and post comments
-      issues: write         # React with emojis and comment on threads
+      issues: write
+      pull-requests: write
     steps:
-      - name: Checkout Code
+      - name: Generate AntigravityCi[bot] Token
+        id: app-token
+        if: env.HAS_APP_KEY == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ANTIGRAVITYCI_APP_ID }}
+          private-key: ${{ secrets.ANTIGRAVITYCI_PRIVATE_KEY }}
+        env:
+          HAS_APP_KEY: ${{ secrets.ANTIGRAVITYCI_PRIVATE_KEY != '' }}
+
+      - name: Fast React & Replay Comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = context.payload.comment;
+            const issue = context.payload.issue;
+            if (!comment || !issue) return;
+
+            // Security: Author role check
+            const authorRole = comment.author_association;
+            const allowedRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+            if (!allowedRoles.includes(authorRole)) {
+              console.log(`User role '${authorRole}' is not authorized. Skipping.`);
+              return;
+            }
+
+            // Case-insensitive regex match for bot tag (@antigravity or @antigravityci)
+            const body = comment.body.trim();
+            const match = body.match(/@antigravity(?:ci)?\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?/i);
+            if (!match) {
+              console.log('Comment does not contain @antigravity / @antigravityci command. Skipping.');
+              return;
+            }
+
+            const cmd = match[1];
+            const instruction = (match[2] || '').trim();
+            const author = comment.user.login;
+
+            // 1. React with +1 (thumbs up) immediately
+            try {
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: comment.id,
+                content: '+1'
+              });
+            } catch (err) {
+              console.log('Reaction error:', err.message);
+            }
+
+            // 2. Post instant instruction replay comment
+            const actionVerb = (cmd.toLowerCase() === 'refactor' || cmd.toLowerCase() === 'refactoring')
+              ? 'Refactoring your code'
+              : `Processing \`${cmd}\``;
+            
+            const replay = `@antigravityci ${cmd} ${instruction}`.trim();
+            const message = `🤖 **AntigravityCI**: ${actionVerb} for @${author}!\n\n> 💬 **Instruction Replay:** \`${replay}\`\n\n⏳ Spawning AI engine and analyzing PR #${issue.number} modified files. I'll open a new PR shortly...`;
+
+            try {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: message
+              });
+            } catch (err) {
+              console.log('Comment error:', err.message);
+            }
+
+  # ==========================================================================
+  # Job 2: Core Processing Engine (Runs concurrently with Job 1)
+  # Performs AI analysis, git branching, PR creation, and reviewer assignment.
+  # ==========================================================================
+  process:
+    name: Process AntigravityCI PR Action
+    # Fast skip (0s): Only runs if the comment contains antigravity / AntiGravity
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && github.actor != 'antigravityci' && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # Needed to create/delete branches and push commits
+      pull-requests: write  # Needed to create PRs, request reviewers, post comments
+      issues: write         # Needed to react and comment on PR issue threads
+    steps:
+      - name: Generate AntigravityCi[bot] Token
+        id: app-token
+        if: env.HAS_APP_KEY == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.ANTIGRAVITYCI_APP_ID }}
+          private-key: ${{ secrets.ANTIGRAVITYCI_PRIVATE_KEY }}
+        env:
+          HAS_APP_KEY: ${{ secrets.ANTIGRAVITYCI_PRIVATE_KEY != '' }}
+
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
 
-      - name: Run AntigravityCI
+      - name: Run AntigravityCI Core Engine
         uses: nivinvysakh/AntigravityCi@main
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          model: "gemini-3.7-flash"
+          github_token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          engine: "auto"
           bot_name: "@antigravityci"
+          post_ack: "false"
 ```
 
 ---
