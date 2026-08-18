@@ -33,3 +33,8 @@ htmlcov/
 .DS_Store
 .vscode/
 .idea/
+
+# Secrets & Logs
+.env
+*.env
+*.log
