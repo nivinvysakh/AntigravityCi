@@ -1,13 +1,16 @@
 # syntax=docker/dockerfile:1
-FROM python:3.11-slim-bookworm
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies, Git, and runtime libraries for llama.cpp
+# Install Python 3, pip, Git, curl, and C++ runtime libraries for llama.cpp
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
     curl \
     git \
     ca-certificates \
@@ -33,7 +36,7 @@ RUN mkdir -p /app/models && \
 
 # Install Python requirements
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
 
 # Copy application files
 COPY main.py /app/main.py
