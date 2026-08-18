@@ -35,11 +35,47 @@ AUTHORIZED_ROLES: set[str] = {"OWNER", "MEMBER", "COLLABORATOR"}
 
 # Safety: Extensions to treat as binary
 BINARY_EXTENSIONS: set[str] = {
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp", ".bmp", ".tiff",
-    ".pdf", ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar", ".exe", ".bin",
-    ".dll", ".so", ".dylib", ".woff", ".woff2", ".eot", ".ttf", ".otf",
-    ".pyc", ".pyo", ".pyd", ".class", ".jar", ".war", ".mp3", ".mp4", ".mov",
-    ".avi", ".flv", ".wav", ".db", ".sqlite", ".sqlite3"
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".svg",
+    ".webp",
+    ".bmp",
+    ".tiff",
+    ".pdf",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".bz2",
+    ".7z",
+    ".rar",
+    ".exe",
+    ".bin",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".woff",
+    ".woff2",
+    ".eot",
+    ".ttf",
+    ".otf",
+    ".pyc",
+    ".pyo",
+    ".pyd",
+    ".class",
+    ".jar",
+    ".war",
+    ".mp3",
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".flv",
+    ".wav",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
 }
 
 # Safety: Lockfiles and generated files to ignore (all lowercase)
@@ -69,6 +105,7 @@ GEMINI_CASCADE_MODELS = [
 # Pydantic Schemas for Structured Output
 # ============================================================================
 
+
 class FileModification(BaseModel):
     path: str = Field(description="Relative path to the file in the repository")
     action: str = Field(description="Action to perform: 'modify', 'create', or 'delete'")
@@ -78,7 +115,9 @@ class FileModification(BaseModel):
 class GeminiPRResponse(BaseModel):
     summary: str = Field(description="A concise 1-2 sentence summary of changes made.")
     explanation: str = Field(description="Detailed markdown explanation of the improvements made and rationale.")
-    pr_title: str = Field(description="Conventional commit style PR title (e.g. 'refactor(api): optimize async request loop')")
+    pr_title: str = Field(
+        description="Conventional commit style PR title (e.g. 'refactor(api): optimize async request loop')"
+    )
     pr_body: str = Field(description="Complete markdown description for the new Pull Request.")
     modified_files: list[FileModification] = Field(description="List of files to modify, create, or delete.")
 
@@ -87,6 +126,7 @@ class GeminiPRResponse(BaseModel):
 # GitHub API Client
 # ============================================================================
 
+
 class GitHubClient:
     """Lightweight wrapper for GitHub REST API calls."""
 
@@ -94,12 +134,14 @@ class GitHubClient:
         self.repo = repo
         self.base_url = f"https://api.github.com/repos/{repo}"
         self.session = requests.Session()
-        self.session.headers.update({
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "AntigravityCI-Bot",
-        })
+        self.session.headers.update(
+            {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "AntigravityCI-Bot",
+            }
+        )
 
     def get_pull_request(self, pr_number: int) -> dict[str, Any]:
         """Fetch Pull Request details."""
@@ -155,9 +197,7 @@ class GitHubClient:
         logger.error(f"Failed to create comment on issue {issue_number}: {resp.status_code} {resp.text}")
         return None
 
-    def create_pull_request(
-        self, title: str, body: str, head: str, base: str
-    ) -> dict[str, Any]:
+    def create_pull_request(self, title: str, body: str, head: str, base: str) -> dict[str, Any]:
         """Create a new Pull Request."""
         url = f"{self.base_url}/pulls"
         payload = {
@@ -230,6 +270,7 @@ class GitHubClient:
 # Git Helper Functions
 # ============================================================================
 
+
 def run_cmd(cmd: list[str], check: bool = True, cwd: Optional[str] = None) -> subprocess.CompletedProcess:
     """Run a shell command safely."""
     logger.debug(f"Running: {' '.join(cmd)}")
@@ -252,6 +293,7 @@ def setup_git_user():
 # ============================================================================
 # Safety and Parsing Utilities
 # ============================================================================
+
 
 @dataclass
 class ParsedCommand:
@@ -320,6 +362,7 @@ def read_file_safely(file_path: str, max_file_size_kb: int = 50) -> Optional[str
 # ============================================================================
 # LLM Execution: Local (Qwen2.5-Coder) & Cloud (Gemini / OpenAI / Groq)
 # ============================================================================
+
 
 def call_local_llama_server(
     prompt: str,
@@ -436,6 +479,7 @@ def call_ai_engine(
 # Event Handlers: PR Closed (Cleanup) & PR Opened (Reviewer Assignment)
 # ============================================================================
 
+
 def handle_pr_closed(gh: GitHubClient, event_data: dict[str, Any]) -> int:
     """Delete the remote branch when an AntigravityCI PR is closed / cancelled."""
     pull_request = event_data.get("pull_request", {})
@@ -485,6 +529,7 @@ def handle_pr_opened(gh: GitHubClient, event_data: dict[str, Any], repo_owner: s
 # ============================================================================
 # Main Execution Flow
 # ============================================================================
+
 
 def main() -> int:
     logger.info("Starting AntigravityCI execution...")
@@ -596,7 +641,9 @@ def main() -> int:
                 else f"Processing `{parsed.command}`"
             )
             replay_text = f"@{bot_name.lstrip('@')} {parsed.command} {parsed.instruction}".strip()
-            engine_label = "Local Qwen2.5-Coder" if (engine == "local" or not gemini_api_key) else f"Cloud ({model_name})"
+            engine_label = (
+                "Local Qwen2.5-Coder" if (engine == "local" or not gemini_api_key) else f"Cloud ({model_name})"
+            )
             ack_message = (
                 f"🤖 **AntigravityCI**: {action_verb} for @{comment_author}!\n\n"
                 f"> 💬 **Instruction Replay:** `{replay_text}`\n\n"
@@ -620,8 +667,7 @@ def main() -> int:
     except Exception as e:
         logger.error(f"Failed to fetch PR info or files: {e}")
         gh.create_issue_comment(
-            pr_number,
-            f"⚠️ **AntigravityCI Error**: Unable to fetch PR #{pr_number} metadata or files.\n```\n{e}\n```"
+            pr_number, f"⚠️ **AntigravityCI Error**: Unable to fetch PR #{pr_number} metadata or files.\n```\n{e}\n```"
         )
         return 1
 
@@ -654,12 +700,14 @@ def main() -> int:
             content = gh.get_file_content(filename, head_sha)
 
         if content is not None:
-            files_context.append({
-                "path": filename,
-                "status": status,
-                "patch": f_meta.get("patch", ""),
-                "content": content,
-            })
+            files_context.append(
+                {
+                    "path": filename,
+                    "status": status,
+                    "patch": f_meta.get("patch", ""),
+                    "content": content,
+                }
+            )
 
     if not files_context:
         msg = (
@@ -713,17 +761,14 @@ def main() -> int:
         logger.info(f"AI response generated successfully using: {engine_used}")
     except Exception as e:
         logger.error(f"AI generation failed: {e}")
-        gh.create_issue_comment(
-            pr_number,
-            f"❌ **AntigravityCI Error**: AI generation failed.\n```\n{e}\n```"
-        )
+        gh.create_issue_comment(pr_number, f"❌ **AntigravityCI Error**: AI generation failed.\n```\n{e}\n```")
         return 1
 
     if not ai_response.modified_files:
         gh.create_issue_comment(
             pr_number,
             f"ℹ️ **AntigravityCI**: Analyzed PR #{pr_number} but determined no file modifications were necessary.\n\n"
-            f"**Explanation:**\n{ai_response.explanation}"
+            f"**Explanation:**\n{ai_response.explanation}",
         )
         return 0
 
@@ -768,7 +813,7 @@ def main() -> int:
         logger.error(f"Git operation failed: {e}")
         gh.create_issue_comment(
             pr_number,
-            f"❌ **AntigravityCI Error**: Failed during Git commit/push for branch `{new_branch_name}`.\n```\n{e}\n```"
+            f"❌ **AntigravityCI Error**: Failed during Git commit/push for branch `{new_branch_name}`.\n```\n{e}\n```",
         )
         return 1
 
@@ -804,7 +849,7 @@ def main() -> int:
         logger.error(f"Failed to create new Pull Request: {e}")
         gh.create_issue_comment(
             pr_number,
-            f"⚠️ **AntigravityCI**: Pushed branch `{new_branch_name}` but failed to open PR against `{target_branch}`.\n```\n{e}\n```"
+            f"⚠️ **AntigravityCI**: Pushed branch `{new_branch_name}` but failed to open PR against `{target_branch}`.\n```\n{e}\n```",
         )
         return 1
 
