@@ -74,6 +74,13 @@ Make sure to test edge cases with expired JWT tokens."""
         assert parsed.command == "refactor"
         assert parsed.instruction == "clean up dead code"
 
+    def test_antigravity_alias_without_ci(self):
+        body = "@AntiGravity doc add google-style docstrings"
+        parsed = parse_comment_command(body)
+        assert parsed is not None
+        assert parsed.command == "doc"
+        assert parsed.instruction == "add google-style docstrings"
+
     def test_irrelevant_comment_ignored(self):
         body = "Looks good to me! LGTM 🚀"
         parsed = parse_comment_command(body)

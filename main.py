@@ -263,10 +263,11 @@ class ParsedCommand:
 def parse_comment_command(body: str, bot_name: str = "@antigravityci") -> Optional[ParsedCommand]:
     """
     Parse comment body to extract bot trigger command and instruction.
-    Pattern: `@antigravityci <command> <instruction>` or `@antigravityci <command>`
+    Pattern: `@antigravityci <command> <instruction>` or `@antigravity <command> <instruction>`
     """
     clean_bot = re.escape(bot_name.lstrip("@"))
-    pattern = rf"@{clean_bot}\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?"
+    alias = clean_bot[:-2] if clean_bot.lower().endswith("ci") else clean_bot
+    pattern = rf"@(?:{clean_bot}|{alias})\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?"
     match = re.search(pattern, body.strip(), re.IGNORECASE)
     if not match:
         return None
