@@ -473,6 +473,29 @@ class TestEndToEndExecution:
         mock_gh.delete_branch.assert_not_called()
 
     @patch("main.GitHubClient")
+    def test_bot_authored_comment_ignored(self, mock_gh_cls, tmp_path, monkeypatch):
+        event_payload = {
+            "action": "created",
+            "issue": {"number": 101, "pull_request": {"url": "..."}},
+            "comment": {
+                "id": 556,
+                "body": "@antigravityci refactor optimize this code",
+                "author_association": "OWNER",
+                "user": {"login": "antigravityci[bot]", "type": "Bot"},
+            },
+        }
+        event_file = tmp_path / "event.json"
+        event_file.write_text(json.dumps(event_payload))
+
+        monkeypatch.setenv("GITHUB_TOKEN", "dummy_token")
+        monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo")
+        monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
+
+        ret = main()
+        assert ret == 0
+        mock_gh_cls.return_value.get_pull_request.assert_not_called()
+
+    @patch("main.GitHubClient")
     def test_pr_opened_assigns_repo_owner(self, mock_gh_cls, tmp_path, monkeypatch):
         event_payload = {
             "action": "opened",

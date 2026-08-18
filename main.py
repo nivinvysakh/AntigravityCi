@@ -200,16 +200,29 @@ class GitHubClient:
         return False
 
     def delete_branch(self, branch_name: str) -> bool:
-        """Delete a remote Git branch ref."""
+        """Delete a remote Git branch ref using GitHub API with Git CLI fallback."""
         url = f"{self.base_url}/git/refs/heads/{branch_name}"
         try:
             resp = self.session.delete(url)
             if resp.status_code in (200, 204):
-                logger.info(f"Deleted remote branch: {branch_name}")
+                logger.info(f"Deleted remote branch via API: {branch_name}")
                 return True
-            logger.warning(f"Could not delete branch {branch_name}: {resp.status_code} {resp.text}")
+            logger.warning(
+                f"API delete ref failed for {branch_name}: {resp.status_code} {resp.text}. Trying git CLI..."
+            )
         except Exception as e:
-            logger.warning(f"Failed to delete branch {branch_name}: {e}")
+            logger.warning(f"Failed to delete branch via API: {e}. Trying git CLI...")
+
+        # Fallback to Git CLI push --delete
+        try:
+            res = run_cmd(["git", "push", "origin", "--delete", branch_name], check=False)
+            if res.returncode == 0:
+                logger.info(f"Deleted remote branch via Git CLI: {branch_name}")
+                return True
+            logger.warning(f"Git CLI push --delete failed: {res.stderr}")
+        except Exception as e:
+            logger.warning(f"Git CLI delete failed: {e}")
+
         return False
 
 
@@ -483,6 +496,8 @@ def main() -> int:
     engine = os.getenv("INPUT_ENGINE", "auto").lower()
     model_name = os.getenv("INPUT_MODEL", "gemini-3.6-flash")
     bot_name = os.getenv("INPUT_BOT_NAME", "@antigravityci")
+    post_ack_input = os.getenv("INPUT_POST_ACK", "true").lower()
+    post_ack = post_ack_input in ("true", "1", "yes")
     max_file_size_kb = int(os.getenv("INPUT_MAX_FILE_SIZE_KB", "50"))
     target_branch_input = os.getenv("INPUT_TARGET_BRANCH", "auto")
 
@@ -541,6 +556,12 @@ def main() -> int:
     comment_author = comment.get("user", {}).get("login", "unknown")
     comment_html_url = comment.get("html_url", "")
 
+    # Ignore bot-authored comments to prevent infinite loops / duplicate triggers
+    comment_author_type = comment.get("user", {}).get("type", "")
+    if comment_author_type == "Bot" or comment_author.endswith("[bot]") or comment_author == "antigravityci":
+        logger.info(f"Comment author '{comment_author}' is a bot. Ignoring to prevent self-trigger loop.")
+        return 0
+
     # Security check: Author association
     if author_association not in AUTHORIZED_ROLES:
         logger.warning(
@@ -560,28 +581,29 @@ def main() -> int:
         f"command='{parsed.command}', instruction='{parsed.instruction}'"
     )
 
-    # 1. Acknowledge with thumbs-up reaction and post replay acknowledgment comment
+    # 1. Acknowledge with thumbs-up reaction and optionally post replay acknowledgment comment
     try:
         gh.add_comment_reaction(comment_id, "+1")
     except Exception as e:
         logger.warning(f"Could not add reaction to comment: {e}")
 
-    try:
-        action_verb = (
-            "Refactoring your code"
-            if parsed.command in ("refactor", "refactoring")
-            else f"Processing `{parsed.command}`"
-        )
-        replay_text = f"@{bot_name.lstrip('@')} {parsed.command} {parsed.instruction}".strip()
-        engine_label = "Local Qwen2.5-Coder" if (engine == "local" or not gemini_api_key) else f"Cloud ({model_name})"
-        ack_message = (
-            f"🤖 **AntigravityCI**: {action_verb} for @{comment_author}!\n\n"
-            f"> 💬 **Instruction Replay:** `{replay_text}`\n\n"
-            f"⏳ Analyzing PR #{pr_number} modified files with {engine_label}. I'll create a branch and open a new PR shortly..."
-        )
-        gh.create_issue_comment(pr_number, ack_message)
-    except Exception as e:
-        logger.warning(f"Could not post initial acknowledgment message: {e}")
+    if post_ack:
+        try:
+            action_verb = (
+                "Refactoring your code"
+                if parsed.command in ("refactor", "refactoring")
+                else f"Processing `{parsed.command}`"
+            )
+            replay_text = f"@{bot_name.lstrip('@')} {parsed.command} {parsed.instruction}".strip()
+            engine_label = "Local Qwen2.5-Coder" if (engine == "local" or not gemini_api_key) else f"Cloud ({model_name})"
+            ack_message = (
+                f"🤖 **AntigravityCI**: {action_verb} for @{comment_author}!\n\n"
+                f"> 💬 **Instruction Replay:** `{replay_text}`\n\n"
+                f"⏳ Analyzing PR #{pr_number} modified files with {engine_label}. I'll create a branch and open a new PR shortly..."
+            )
+            gh.create_issue_comment(pr_number, ack_message)
+        except Exception as e:
+            logger.warning(f"Could not post initial acknowledgment message: {e}")
 
     # 2. Fetch PR details and modified files
     try:
