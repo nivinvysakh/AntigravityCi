@@ -74,65 +74,16 @@ jobs:
       issues: write
       pull-requests: write
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Fast React & Replay Comment
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const comment = context.payload.comment;
-            const issue = context.payload.issue;
-            if (!comment || !issue) return;
-
-            // Security: Author role check
-            const authorRole = comment.author_association;
-            const allowedRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
-            if (!allowedRoles.includes(authorRole)) {
-              console.log(`User role '${authorRole}' is not authorized. Skipping.`);
-              return;
-            }
-
-            // Case-insensitive regex match for bot tag (@antigravity or @antigravityci)
-            const body = comment.body.trim();
-            const match = body.match(/@antigravity(?:ci)?\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?/i);
-            if (!match) {
-              console.log('Comment does not contain @antigravity / @antigravityci command. Skipping.');
-              return;
-            }
-
-            const cmd = match[1];
-            const instruction = (match[2] || '').trim();
-            const author = comment.user.login;
-
-            // 1. React with +1 (thumbs up) immediately
-            try {
-              await github.rest.reactions.createForIssueComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: comment.id,
-                content: '+1'
-              });
-            } catch (err) {
-              console.log('Reaction error:', err.message);
-            }
-
-            // 2. Post instant instruction replay comment
-            const actionVerb = (cmd.toLowerCase() === 'refactor' || cmd.toLowerCase() === 'refactoring')
-              ? 'Refactoring your code'
-              : `Processing \`${cmd}\``;
-            
-            const replay = `@antigravityci ${cmd} ${instruction}`.trim();
-            const message = `🤖 **AntigravityCI**: ${actionVerb} for @${author}!\n\n> 💬 **Instruction Replay:** \`${replay}\`\n\n⏳ Spawning AI engine and analyzing PR #${issue.number} modified files. I'll open a new PR shortly...`;
-
-            try {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                body: message
-              });
-            } catch (err) {
-              console.log('Comment error:', err.message);
-            }
+            const acknowledge = require('./scripts/acknowledge.js');
+            await acknowledge({ github, context });
 
   # ==========================================================================
   # Job 2: Core Processing Engine (Runs concurrently with Job 1)
@@ -162,6 +113,8 @@ jobs:
           bot_name: "@antigravityci"
           post_ack: "false"
 ```
+
+> **Note:** For Job 1, copy [`scripts/acknowledge.js`](scripts/acknowledge.js) into your repository's `scripts/` directory to enable instant (<2s) comment acknowledgment.
 
 ---
 
