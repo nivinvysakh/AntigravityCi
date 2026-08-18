@@ -1,4 +1,4 @@
-<div align="center">
+<img src="https://ico.hugeicons.com/google-gemini-solid-rounded-512.webp" alt="AntigravityCI Logo" width="130" align="right" />
 
 # 🌌 AntigravityCI
 
@@ -9,11 +9,9 @@
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/features/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F1C40F?style=for-the-badge)](LICENSE)
 
-<p align="center">
-  <b>Transform Pull Request comments into autonomous AI code refactoring, bug fixing, test writing, and doc generation.</b>
-</p>
+**Transform Pull Request comments into autonomous AI code refactoring, bug fixing, test writing, and doc generation.**
 
-</div>
+<br clear="right" />
 
 ---
 
