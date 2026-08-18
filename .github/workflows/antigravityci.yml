@@ -11,18 +11,8 @@ jobs:
   # ==========================================================================
   acknowledge:
     name: Instant Acknowledgment
-    # Fast skip (0s): Only runs if the comment contains @antigravity or @antigravityci
-    if: >-
-      github.event.issue.pull_request &&
-      github.event.comment.user.type != 'Bot' &&
-      !endsWith(github.actor, '[bot]') &&
-      github.actor != 'antigravityci' &&
-      (
-        contains(github.event.comment.body, '@antigravity') ||
-        contains(github.event.comment.body, '@Antigravity') ||
-        contains(github.event.comment.body, '@AntiGravity') ||
-        contains(github.event.comment.body, '@ANTIGRAVITY')
-      )
+    # Fast skip (0s): Only runs if the comment contains antigravity / AntiGravity
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && github.actor != 'antigravityci' && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -105,18 +95,8 @@ jobs:
   # ==========================================================================
   process:
     name: Process AntigravityCI PR Action
-    # Fast skip (0s): Only runs if the comment contains @antigravity or @antigravityci
-    if: >-
-      github.event.issue.pull_request &&
-      github.event.comment.user.type != 'Bot' &&
-      !endsWith(github.actor, '[bot]') &&
-      github.actor != 'antigravityci' &&
-      (
-        contains(github.event.comment.body, '@antigravity') ||
-        contains(github.event.comment.body, '@Antigravity') ||
-        contains(github.event.comment.body, '@AntiGravity') ||
-        contains(github.event.comment.body, '@ANTIGRAVITY')
-      )
+    # Fast skip (0s): Only runs if the comment contains antigravity / AntiGravity
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && github.actor != 'antigravityci' && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write       # Needed to create/delete branches and push commits
