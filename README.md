@@ -1,6 +1,6 @@
 <img src="https://ico.hugeicons.com/google-gemini-solid-rounded-512.webp" alt="AntigravityCI Logo" width="130" align="right" />
 
-# 🌌 AntigravityCI
+### 🌌 AntigravityCI
 
 ### Autonomous AI PR Assistant · Embedded Local LLMs & Google Gemini ♊
 
