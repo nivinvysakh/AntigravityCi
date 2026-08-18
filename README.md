@@ -1,57 +1,75 @@
-[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Docker%20Container-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
-[![Local LLM](https://img.shields.io/badge/Local%20LLM-Qwen2.5--Coder--1.5B-green.svg)](https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF)
-[![Google Gemini](https://img.shields.io/badge/Cloud%20Fallback-Gemini%20Flash%20Cascade-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<div align="center">
 
-**AntigravityCI** is an open-source, AI-powered GitHub Action that acts as an intelligent PR assistant directly inside your Pull Request comments. 
+# 🌌 AntigravityCI
 
-It runs as a **self-contained Docker Action** with an **embedded local Qwen2.5-Coder-1.5B LLM** powered by `llama.cpp` — requiring **zero API keys and zero configuration**. It also supports optional cloud fallbacks to **Google Gemini** (with automatic multi-model cascade).
+### Autonomous AI PR Assistant · Embedded Local LLMs & Google Gemini ♊
+
+[![Google Gemini](https://img.shields.io/badge/Google%20Gemini-8E75FF?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
+[![Local LLM](https://img.shields.io/badge/Local%20LLM-Qwen2.5--Coder-00C7B7?style=for-the-badge&logo=huggingface&logoColor=white)](https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/features/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F1C40F?style=for-the-badge)](LICENSE)
+
+<p align="center">
+  <b>Transform Pull Request comments into autonomous AI code refactoring, bug fixing, test writing, and doc generation.</b>
+</p>
+
+</div>
 
 ---
 
-## 🎬 Demo
+## 🌟 Overview
+
+**AntigravityCI** is an open-source, AI-powered GitHub Action that acts as an intelligent pair-programming assistant directly inside your Pull Request discussion threads.
+
+- 🧠 **Dual-Engine Architecture**: Runs **100% offline & free** on runner CPUs with embedded **Qwen2.5-Coder-1.5B** (`llama.cpp`), or seamlessly cascades to **Google Gemini** (♊ `gemini-3.6-flash` / `gemini-3.7-flash`) when an API key is provided.
+- ⚡ **Sub-2-Second Feedback**: Ultra-fast acknowledgment reacts with 👍 and replays instructions in **<1.5s**, while the core AI engine analyzes diffs and opens a clean, reviewed Pull Request in the background.
+- 🛡️ **Enterprise-Grade Safety**: Strict role enforcement (`OWNER`, `MEMBER`, `COLLABORATOR`), automated lockfile filtering, binary asset exclusion, and protected branch isolation.
+
+---
+
+## 🎬 How It Works
 
 ```text
-PR Comment:
-  @antigravityci refactor optimize this async loop and eliminate redundant DB calls
+1. Developer comments on a PR:
+   @antigravity refactor optimize this async query loop and eliminate redundant DB calls
 
-AntigravityCI:
-  👍 Reacts with +1 to acknowledge receipt
-  💬 Replies immediately with instruction replay
-  🧠 Generates code improvements (via Local Qwen2.5-Coder or Cloud Gemini)
-  🌿 Creates branch: antigravityci/refactor-pr42-a8f9
-  📝 Commits code & pushes to origin
-  🚀 Opens Pull Request #43 targeting `main`
-  💬 Comments PR link with full change summary on original PR
+2. AntigravityCI reacts instantly:
+   👍 Reacts +1 to comment in <1.5s
+   💬 Replies immediately with instruction replay
+
+3. AntigravityCI executes in the background:
+   🧠 Analyzes PR file diffs with Local Qwen2.5-Coder or Google Gemini
+   🌿 Creates dedicated branch: antigravityci/refactor-pr42-a8f9
+   📝 Commits refactored code & pushes to origin
+   🚀 Opens new Pull Request #43 targeting the base branch
+   💬 Posts PR link and change summary to the original thread
 ```
-
-> _[Demo GIF Placeholder: Replace with `docs/assets/demo.gif`]_
 
 ---
 
 ## ✨ Features
 
-- **🔒 100% Offline & Free by Default**: Embedded local `Qwen2.5-Coder-1.5B` GGUF engine running on CPU via `llama.cpp`. Zero API keys, zero 503 rate limits.
-- **⚡ Cloud Cascade (Optional)**: If you provide a `GEMINI_API_KEY`, it uses Gemini with an automatic multi-model fallback cascade (`gemini-2.5-flash` $\rightarrow$ `gemini-2.0-flash` $\rightarrow$ `gemini-1.5-flash` $\rightarrow$ local fallback) to eliminate downtime.
-- **💬 Comment-Driven Trigger**: Mention `@antigravityci <command> <instruction>` on any PR comment to trigger.
-- **⚡ Instant Feedback**: Reacts with 👍 and replies with an immediate instruction replay comment, followed by a 🚀 reaction on completion.
-- **🛡️ Built-in Security Authorization**: Enforces strict role checks—only repository `OWNER`, `MEMBER`, and `COLLABORATOR` roles can trigger workflows.
-- **🔒 Safety File Filters**: Automatically ignores lockfiles (`package-lock.json`, `poetry.lock`, `Cargo.lock`, etc.), binary assets, and oversized files (>50KB).
-- **🌿 Dedicated Branch & PR Creation**: Generates dedicated branches (`antigravityci/<command>-pr<number>-<short-id>`) and opens clean Pull Requests for human review.
+- **♊ Google Gemini Powered**: Native integration with Google Gemini 3.6 & 3.7 Flash models with automated multi-model cascade fallbacks.
+- **🔒 100% Offline & Free Mode**: Embedded `Qwen2.5-Coder-1.5B` GGUF engine running directly on GitHub Actions CPU runners via `llama.cpp`. Zero API keys required.
+- **💬 Multi-Handle Support**: Supports `@antigravity`, `@AntiGravity`, `@antigravityci`, and `@AntigravityCI` commands.
+- **⚡ 2-Job Concurrent Architecture**: Instant acknowledgment (<1.5s) decoupled from the heavy AI code generation pipeline.
+- **🛡️ Built-in Security Authorization**: Enforces strict repository permission checks—only authorized collaborators can trigger runs.
+- **🚫 Safe Context Filters**: Automatically filters out lockfiles (`package-lock.json`, `poetry.lock`, `Cargo.lock`, etc.), binary assets, and oversized files (>50KB).
+- **🌿 Clean Branch Isolation**: Never modifies existing PR branches or commits directly to `main`—always creates a clean, isolated branch and PR for human review.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (1-Minute Setup)
 
-### 1. Get a Google Gemini API Key
-Obtain an API key from [Google AI Studio](https://aistudio.google.com/).
+### 1. (Optional) Get a Google Gemini API Key
+If you want cloud-accelerated intelligence, get a free API key from [Google AI Studio](https://aistudio.google.com/). *(If omitted, AntigravityCI runs 100% locally with embedded Qwen2.5-Coder!)*
 
 ### 2. Add Secrets to your GitHub Repository
 Go to **Settings > Secrets and variables > Actions** and add:
-- `GEMINI_API_KEY`: Your Google Gemini API Key.
+- `GEMINI_API_KEY`: *(Optional)* Your Google Gemini API Key.
 
 ### 3. Create the Workflow File
-Add `.github/workflows/antigravityci.yml` to your repository:
+Create `.github/workflows/antigravityci.yml` in your repository and paste the following:
 
 ```yaml
 name: AntigravityCI PR Assistant
@@ -165,28 +183,30 @@ jobs:
 
 ## 💡 Example Commands
 
-You can tag AntigravityCI in any PR comment with any custom command and instruction:
+Tag AntigravityCI in any Pull Request discussion with any natural instruction:
 
 | Command | Example Usage | What AntigravityCI Does |
 |---|---|---|
-| `refactor` | `@antigravityci refactor optimize this async query loop` | Refactors code for performance and readability |
-| `fix` | `@antigravityci fix handle edge case when token is expired` | Resolves bugs and implements edge-case guards |
-| `test` | `@antigravityci test add pytest test cases for auth module` | Generates comprehensive test suites |
-| `review` | `@antigravityci review check for potential memory leaks` | Analyzes code and suggests hardened solutions |
-| `doc` | `@antigravityci doc add Google-style docstrings to public API` | Adds clean documentation and type annotations |
+| `refactor` | `@antigravity refactor optimize this async query loop` | Refactors code for performance, readability, and idiomatic style |
+| `fix` | `@antigravity fix handle edge case when token is expired` | Identifies bugs, resolves exceptions, and adds edge-case guards |
+| `test` | `@antigravity test add pytest test cases for auth module` | Generates comprehensive unit and integration test suites |
+| `doc` | `@antigravity doc add Google-style docstrings with examples` | Adds clean type annotations, docstrings, and documentation |
+| `review` | `@antigravity review check for memory leaks and race conditions` | Audits modified files and implements hardened solutions |
 
 ---
 
-## ⚙️ Configuration Options
+## ⚙️ Action Inputs
 
 | Input | Description | Required | Default |
 |---|---|:---:|:---:|
-| `gemini_api_key` | Google Gemini API Key | **Yes** | — |
-| `github_token` | GitHub token for git & API operations | No | `${{ github.token }}` |
-| `model` | Gemini model name (e.g. `gemini-3.7-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`) | No | `gemini-3.7-flash` |
-| `bot_name` | Comment trigger handle | No | `@antigravityci` |
+| `github_token` | GitHub Token for API operations (`secrets.GITHUB_TOKEN`) | No | `${{ github.token }}` |
+| `gemini_api_key` | Optional Google Gemini API Key for cloud fallback | No | `""` |
+| `engine` | AI Engine: `'auto'`, `'local'`, or `'gemini'` | No | `"auto"` |
+| `model` | Gemini model name (`gemini-3.6-flash`, `gemini-3.7-flash`) | No | `"gemini-3.6-flash"` |
+| `bot_name` | Comment trigger handle | No | `"@antigravityci"` |
+| `post_ack` | Whether to post instruction replay (set `"false"` if Job 1 enabled) | No | `"true"` |
 | `max_file_size_kb` | Max individual file size in KB sent to LLM context | No | `50` |
-| `target_branch` | Target branch for generated PR (`auto` uses base of PR) | No | `auto` |
+| `target_branch` | Target branch for generated PR (`auto` uses base of PR) | No | `"auto"` |
 
 ---
 
@@ -195,22 +215,26 @@ You can tag AntigravityCI in any PR comment with any custom command and instruct
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Collaborator as Collaborator (Owner/Member)
-    participant GH as GitHub PR / Actions
-    participant Action as AntigravityCI (main.py)
-    participant Gemini as Google Gemini 3.7 Flash
+    actor Collaborator as Developer (Collaborator/Owner)
+    participant GH as GitHub PR Thread
+    participant AckJob as Job 1: Instant Ack (<1.5s)
+    participant EngineJob as Job 2: AI Core Engine
+    participant LLM as Google Gemini ♊ / Local Qwen
 
-    Collaborator->>GH: Comment: "@antigravityci refactor optimize query"
-    GH->>Action: Trigger issue_comment workflow
-    Action->>GH: Verify author role (OWNER/MEMBER/COLLABORATOR)
-    Action->>GH: Add "+1" 👍 emoji reaction & reply with instruction replay
-    Action->>GH: Fetch modified PR files (excluding lockfiles/binary/>50KB)
-    Action->>Gemini: Send files context + prompt (via google-genai SDK)
-    Gemini-->>Action: Return structured Pydantic response (modified_files, summary, pr_body)
-    Action->>GH: Checkout new branch antigravityci/refactor-pr42-xxx
-    Action->>GH: Write changes, git commit & git push
-    Action->>GH: Open new Pull Request targeting main
-    Action->>GH: Post reply comment with new PR link & react 🚀
+    Collaborator->>GH: Comment: "@antigravity refactor optimize loop"
+    par Concurrent Execution
+        GH->>AckJob: issue_comment event
+        AckJob->>GH: React 👍 (+1) in <1.5s
+        AckJob->>GH: Post instant instruction replay comment
+    and
+        GH->>EngineJob: issue_comment event
+        EngineJob->>GH: Fetch modified PR files (excluding lockfiles/binary)
+        EngineJob->>LLM: Send files context + user instruction
+        LLM-->>EngineJob: Return structured file modifications & explanation
+        EngineJob->>GH: Git branch & commit refactored files
+        EngineJob->>GH: Open new Pull Request targeting base branch
+        EngineJob->>GH: Request review & post PR link with 🚀 reaction
+    end
 ```
 
 ---
@@ -218,38 +242,34 @@ sequenceDiagram
 ## 🛡️ Security & Safety Model
 
 1. **Role Enforcement**:
-   - Only users with `author_association` of `OWNER`, `MEMBER`, or `COLLABORATOR` can invoke AntigravityCI. Comments from unauthorized users (`CONTRIBUTOR`, `FIRST_TIME_CONTRIBUTOR`, `NONE`) are safely ignored.
+   - Only users with `author_association` of `OWNER`, `MEMBER`, or `COLLABORATOR` can invoke AntigravityCI. Comments from unauthorized users are safely ignored.
 2. **Context Safety**:
-   - Lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `poetry.lock`, etc.) are filtered out to prevent token waste and context bloat.
-   - Binary files and oversized files (>50KB by default) are omitted.
+   - Lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `poetry.lock`, etc.) are filtered out to prevent context bloat.
+   - Binary assets and oversized files (>50KB) are skipped automatically.
 3. **Branch Isolation**:
    - AntigravityCI never pushes directly to existing PR branches or protected branches. It always creates a fresh, isolated branch and opens a new Pull Request for human review.
 
 ---
 
-## 🧪 Local Development & Testing
+## 🧪 Local Development
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-org/antigravityci.git
-   cd antigravityci
+   git clone https://github.com/nivinvysakh/AntigravityCi.git
+   cd AntigravityCi
    ```
 
-2. Install dependencies:
+2. Set up virtual environment:
    ```bash
-   python -m venv .venv
+   python3 -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt
    pip install pytest pytest-mock ruff
    ```
 
-3. Run test suite:
+3. Run automated tests and linters:
    ```bash
-   pytest tests/ -v
-   ```
-
-4. Run linter:
-   ```bash
+   pytest -v
    ruff check .
    ```
 
