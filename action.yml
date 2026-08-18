@@ -26,6 +26,10 @@ inputs:
     description: "Trigger handle for the bot in comments"
     required: false
     default: "@antigravityci"
+  post_ack:
+    description: "Whether to post the initial instruction replay comment (set false if handled by fast acknowledge job)"
+    required: false
+    default: "true"
   max_file_size_kb:
     description: "Maximum file size in KB to send to the model context (safety filter)"
     required: false
