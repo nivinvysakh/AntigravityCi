@@ -1,6 +1,5 @@
 name: AntigravityCI PR Assistant
 
-# STRICT TRIGGER: Only run when a user posts a comment on a PR
 on:
   issue_comment:
     types: [created]
@@ -12,13 +11,8 @@ jobs:
   # ==========================================================================
   acknowledge:
     name: Instant Acknowledgment
-    # ONLY run for human comments on a PR that explicitly mention @antigravityci
-    if: >-
-      github.event.issue.pull_request &&
-      github.event.comment.user.type != 'Bot' &&
-      !endsWith(github.event.comment.user.login, '[bot]') &&
-      github.event.comment.user.login != 'antigravityci' &&
-      contains(github.event.comment.body, '@antigravityci')
+    # Run for human comments on a PR
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && github.actor != 'antigravityci' }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -44,6 +38,7 @@ jobs:
             const issue = context.payload.issue;
             if (!comment || !issue) return;
 
+            // Security: Author role check
             const authorRole = comment.author_association;
             const allowedRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
             if (!allowedRoles.includes(authorRole)) {
@@ -51,9 +46,13 @@ jobs:
               return;
             }
 
+            // Case-insensitive regex match for bot tag
             const body = comment.body.trim();
             const match = body.match(/@antigravityci\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?/i);
-            if (!match) return;
+            if (!match) {
+              console.log('Comment does not contain @antigravityci command. Skipping.');
+              return;
+            }
 
             const cmd = match[1];
             const instruction = (match[2] || '').trim();
@@ -96,13 +95,8 @@ jobs:
   # ==========================================================================
   process:
     name: Process AntigravityCI PR Action
-    # ONLY run for human comments on a PR that explicitly mention @antigravityci
-    if: >-
-      github.event.issue.pull_request &&
-      github.event.comment.user.type != 'Bot' &&
-      !endsWith(github.event.comment.user.login, '[bot]') &&
-      github.event.comment.user.login != 'antigravityci' &&
-      contains(github.event.comment.body, '@antigravityci')
+    # Run for human comments on a PR
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && github.actor != 'antigravityci' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write       # Needed to create/delete branches and push commits
