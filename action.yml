@@ -1,25 +1,20 @@
 name: "AntigravityCI"
-description: "AI PR assistant powered by embedded local Qwen2.5-Coder (zero API keys needed) with optional Google Gemini / Cloud fallback."
+description: "Autonomous AI PR Assistant powered by Google Gemini ♊."
 author: "Antigravity Team"
 branding:
   icon: "cpu"
   color: "purple"
 
 inputs:
-  engine:
-    description: "AI Engine: 'auto' (defaults to Cloud if key provided, else Local), 'local' (offline Qwen2.5-Coder), or 'gemini'"
-    required: false
-    default: "auto"
   gemini_api_key:
-    description: "Optional Google Gemini API Key. If not provided, runs 100% locally with embedded Qwen2.5-Coder."
-    required: false
-    default: ""
+    description: "Google Gemini API Key (from https://aistudio.google.com/)"
+    required: true
   github_token:
     description: "GitHub Token for API operations (creating reactions, branches, comments, PRs)"
     required: false
     default: "${{ github.token }}"
   model:
-    description: "Gemini Model name to use when running in cloud mode (with automatic cascade fallback)"
+    description: "Google Gemini Model name (with automatic multi-model cascade fallback)"
     required: false
     default: "gemini-3.6-flash"
   bot_name:
@@ -43,7 +38,6 @@ runs:
   using: "docker"
   image: "Dockerfile"
   env:
-    INPUT_ENGINE: ${{ inputs.engine }}
     GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
     GITHUB_TOKEN: ${{ inputs.github_token }}
     INPUT_MODEL: ${{ inputs.model }}

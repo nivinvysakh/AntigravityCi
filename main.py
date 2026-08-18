@@ -360,51 +360,8 @@ def read_file_safely(file_path: str, max_file_size_kb: int = 50) -> Optional[str
 
 
 # ============================================================================
-# LLM Execution: Local (Qwen2.5-Coder) & Cloud (Gemini / OpenAI / Groq)
+# LLM Execution: Google Gemini Cascade Engine
 # ============================================================================
-
-
-def call_local_llama_server(
-    prompt: str,
-    system_instruction: str,
-    base_url: str = "http://127.0.0.1:8080",
-) -> GeminiPRResponse:
-    """Call the embedded local llama-server running Qwen2.5-Coder."""
-    url = f"{base_url}/v1/chat/completions"
-    schema_prompt = (
-        f"{system_instruction}\n\n"
-        "CRITICAL: You MUST respond ONLY with a valid JSON object matching this schema:\n"
-        "{\n"
-        '  "summary": "Brief summary",\n'
-        '  "explanation": "Markdown explanation",\n'
-        '  "pr_title": "Conventional commit title",\n'
-        '  "pr_body": "Detailed PR body",\n'
-        '  "modified_files": [\n'
-        '    {"path": "relative/path.ext", "action": "modify", "content": "full updated code"}\n'
-        "  ]\n"
-        "}"
-    )
-
-    payload = {
-        "messages": [
-            {"role": "system", "content": schema_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 4096,
-        "response_format": {"type": "json_object"},
-    }
-
-    logger.info(f"Querying embedded local LLM server at {url}...")
-    resp = requests.post(url, json=payload, timeout=300)
-    resp.raise_for_status()
-    res_json = resp.json()
-    content = res_json["choices"][0]["message"]["content"]
-
-    content = re.sub(r"^```(?:json)?\s*", "", content.strip())
-    content = re.sub(r"\s*```$", "", content)
-    data = json.loads(content)
-    return GeminiPRResponse(**data)
 
 
 def call_gemini_cascade(
@@ -445,34 +402,16 @@ def call_gemini_cascade(
 
 
 def call_ai_engine(
-    engine: str,
     gemini_api_key: Optional[str],
     model_name: str,
     prompt: str,
     system_instruction: str,
 ) -> tuple[GeminiPRResponse, str]:
-    """Unified AI dispatcher supporting Local Qwen2.5-Coder and Cloud fallback."""
-    if engine == "local" or not gemini_api_key:
-        try:
-            res = call_local_llama_server(prompt, system_instruction)
-            return res, "local-qwen2.5-coder-1.5b"
-        except Exception as local_err:
-            if not gemini_api_key:
-                raise RuntimeError(f"Local LLM engine failed and no GEMINI_API_KEY provided: {local_err}")
-            logger.warning(f"Local LLM failed ({local_err}), falling back to cloud Gemini...")
+    """AI dispatcher powered by Google Gemini with multi-model cascade."""
+    if not gemini_api_key:
+        raise ValueError("Missing GEMINI_API_KEY. Please provide your Google Gemini API Key in repository secrets.")
 
-    if gemini_api_key:
-        try:
-            return call_gemini_cascade(gemini_api_key, model_name, prompt, system_instruction)
-        except Exception as gemini_err:
-            logger.warning(f"Gemini cloud failed: {gemini_err}. Attempting local engine fallback...")
-            try:
-                res = call_local_llama_server(prompt, system_instruction)
-                return res, "local-qwen2.5-coder-1.5b (fallback)"
-            except Exception as e:
-                raise RuntimeError(f"Both Cloud Gemini and Local LLM failed: {gemini_err} | {e}")
-
-    raise RuntimeError("No valid AI engine available.")
+    return call_gemini_cascade(gemini_api_key, model_name, prompt, system_instruction)
 
 
 # ============================================================================
@@ -539,7 +478,6 @@ def main() -> int:
     github_token = os.getenv("GITHUB_TOKEN")
     github_repository = os.getenv("GITHUB_REPOSITORY")
     github_event_path = os.getenv("GITHUB_EVENT_PATH")
-    engine = os.getenv("INPUT_ENGINE", "auto").lower()
     model_name = os.getenv("INPUT_MODEL", "gemini-3.6-flash")
     bot_name = os.getenv("INPUT_BOT_NAME", "@antigravityci")
     post_ack_input = os.getenv("INPUT_POST_ACK", "true").lower()
@@ -641,9 +579,7 @@ def main() -> int:
                 else f"Processing `{parsed.command}`"
             )
             replay_text = f"@{bot_name.lstrip('@')} {parsed.command} {parsed.instruction}".strip()
-            engine_label = (
-                "Local Qwen2.5-Coder" if (engine == "local" or not gemini_api_key) else f"Cloud ({model_name})"
-            )
+            engine_label = f"Google Gemini ({model_name})"
             ack_message = (
                 f"🤖 **AntigravityCI**: {action_verb} for @{comment_author}!\n\n"
                 f"> 💬 **Instruction Replay:** `{replay_text}`\n\n"
@@ -749,10 +685,9 @@ def main() -> int:
         f"Context JSON:\n{json.dumps(prompt_payload, indent=2)}"
     )
 
-    # 5. Call AI Engine (Local Qwen2.5-Coder or Cloud with Fallback Cascade)
+    # 5. Call AI Engine (Google Gemini Cascade)
     try:
         ai_response, engine_used = call_ai_engine(
-            engine=engine,
             gemini_api_key=gemini_api_key,
             model_name=model_name,
             prompt=user_prompt,
