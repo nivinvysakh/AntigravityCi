@@ -68,27 +68,16 @@ jobs:
   acknowledge:
     name: Instant Acknowledgment
     # Fast skip (0s): Only runs if the comment contains antigravity / AntiGravity
-    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && github.actor != 'antigravityci' && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
       pull-requests: write
     steps:
-      - name: Generate AntigravityCi[bot] Token
-        id: app-token
-        if: env.HAS_APP_KEY == 'true'
-        continue-on-error: true
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.ANTIGRAVITYCI_APP_ID }}
-          private-key: ${{ secrets.ANTIGRAVITYCI_PRIVATE_KEY }}
-        env:
-          HAS_APP_KEY: ${{ secrets.ANTIGRAVITYCI_PRIVATE_KEY != '' }}
-
       - name: Fast React & Replay Comment
         uses: actions/github-script@v7
         with:
-          github-token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const comment = context.payload.comment;
             const issue = context.payload.issue;
@@ -152,35 +141,23 @@ jobs:
   process:
     name: Process AntigravityCI PR Action
     # Fast skip (0s): Only runs if the comment contains antigravity / AntiGravity
-    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && github.actor != 'antigravityci' && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write       # Needed to create/delete branches and push commits
       pull-requests: write  # Needed to create PRs, request reviewers, post comments
       issues: write         # Needed to react and comment on PR issue threads
     steps:
-      - name: Generate AntigravityCi[bot] Token
-        id: app-token
-        if: env.HAS_APP_KEY == 'true'
-        continue-on-error: true
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.ANTIGRAVITYCI_APP_ID }}
-          private-key: ${{ secrets.ANTIGRAVITYCI_PRIVATE_KEY }}
-        env:
-          HAS_APP_KEY: ${{ secrets.ANTIGRAVITYCI_PRIVATE_KEY != '' }}
-
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
 
       - name: Run AntigravityCI Core Engine
         uses: nivinvysakh/AntigravityCi@main
         with:
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          github_token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}  # Optional (runs locally on CPU if omitted)
           engine: "auto"
           bot_name: "@antigravityci"
           post_ack: "false"
