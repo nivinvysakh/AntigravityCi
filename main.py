@@ -28,6 +28,8 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger("antigravityci")
+logging.getLogger("google").setLevel(logging.ERROR)
+logging.getLogger("google.genai").setLevel(logging.ERROR)
 
 # Security: Allowed GitHub author associations
 AUTHORIZED_ROLES: set[str] = {"OWNER", "MEMBER", "COLLABORATOR"}
