@@ -68,103 +68,70 @@ on:
     types: [created]
 
 jobs:
-  # ==========================================================================
-  # Job 1: Instant Acknowledgment (<2s)
-  # Self-contained: Reacts with 👍 and replays instruction immediately.
-  # ==========================================================================
   acknowledge:
     name: Instant Acknowledgment
-    # Fast skip (0s): Only runs if the comment contains antigravity / AntiGravity
     if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
       pull-requests: write
     steps:
-      - name: Fast React & Replay Comment
+      - name: Fast React & Reply
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const comment = context.payload.comment;
-            const issue = context.payload.issue;
+            const { comment, issue } = context.payload;
             if (!comment || !issue) return;
 
-            // Security: Author role check
             const allowedRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
-            if (!allowedRoles.includes(comment.author_association)) {
-              console.log(`Role '${comment.author_association}' not authorized. Skipping.`);
-              return;
-            }
+            if (!allowedRoles.includes(comment.author_association)) return;
 
-            // Case-insensitive regex match for bot tag (@antigravity or @antigravityci)
             const match = comment.body.trim().match(/@antigravity(?:ci)?\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?/i);
-            if (!match) {
-              console.log('Comment does not contain @antigravity / @antigravityci command. Skipping.');
-              return;
-            }
+            if (!match) return;
 
-            const cmd = match[1];
-            const instruction = (match[2] || '').trim();
+            const [, cmd, rawInstruction] = match;
+            const instruction = (rawInstruction || '').trim();
             const author = comment.user.login;
 
-            // 1. React with +1 (thumbs up) immediately
-            try {
-              await github.rest.reactions.createForIssueComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: comment.id,
-                content: '+1'
-              });
-            } catch (err) {
-              console.log('Reaction error:', err.message);
-            }
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: comment.id,
+              content: '+1'
+            }).catch(() => {});
 
-            // 2. Post instant instruction replay comment
-            const actionVerb = (cmd.toLowerCase() === 'refactor' || cmd.toLowerCase() === 'refactoring')
-              ? 'Refactoring your code'
-              : `Processing \`${cmd}\``;
-            
+            const actionVerb = cmd.toLowerCase().startsWith('refactor') ? 'Refactoring your code' : `Processing \`${cmd}\``;
             const replay = `@antigravityci ${cmd} ${instruction}`.trim();
             const message = `🤖 **AntigravityCI**: ${actionVerb} for @${author}!\n\n> 💬 **Instruction Replay:** \`${replay}\`\n\n⏳ Spawning AI engine and analyzing PR #${issue.number} modified files. I'll open a new PR shortly...`;
 
-            try {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                body: message
-              });
-            } catch (err) {
-              console.log('Comment error:', err.message);
-            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: message
+            }).catch(() => {});
 
-  # ==========================================================================
-  # Job 2: Core Processing Engine (Runs concurrently with Job 1)
-  # Performs AI analysis, git branching, PR creation, and reviewer assignment.
-  # ==========================================================================
   process:
     name: Process AntigravityCI PR Action
-    # Fast skip (0s): Only runs if the comment contains antigravity / AntiGravity
     if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # Needed to create/delete branches and push commits
-      pull-requests: write  # Needed to create PRs, request reviewers, post comments
-      issues: write         # Needed to react and comment on PR issue threads
+      contents: write
+      pull-requests: write
+      issues: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run AntigravityCI Core Engine
-        uses: nivinvysakh/AntigravityCi@main
+      - name: Run AntigravityCI
+        uses: nivinvysakh/AntigravityCi@v1.0.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           model: "gemini-3.6-flash"
-          bot_name: "@antigravityci"
           post_ack: "false"
 ```
 
