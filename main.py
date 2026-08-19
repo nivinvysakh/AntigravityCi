@@ -763,7 +763,7 @@ def main() -> int:
             f"### 🔍 Detailed Explanation\n{ai_response.explanation}\n\n"
             f"### 📁 Modified Files ({len(changed_paths)})\n"
             + "\n".join(f"- `{p}`" for p in changed_paths)
-            + f"\n\n---\n*Generated with 🧠 [{engine_used}](https://github.com/{github_repository}) via AntigravityCI.*"
+            + f"\n\n---\n*Generated with 🧠 [{engine_used}](https://github.com/{github_repository}) via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*"
         )
 
         new_pr = gh.create_pull_request(
