@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/nivin/antigravity/discussions
+    about: For questions, ideas, and general discussions about AntigravityCI
+  - name: 📖 Documentation
+    url: https://github.com/nivin/antigravity#readme
+    about: Read the README and project documentation
+  - name: 🔒 Security Issue
+    url: https://github.com/nivin/antigravity/security/policy
+    about: Report security vulnerabilities responsibly
