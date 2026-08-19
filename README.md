@@ -60,7 +60,17 @@ Go to **Settings > Secrets and variables > Actions** and add:
 
 - `GEMINI_API_KEY`: Your Google Gemini API Key.
 
-### 3. Create the Workflow File
+### 3. Enable Workflow Permissions (Important ⚠️)
+
+To allow AntigravityCI to push refactored code and open Pull Requests:
+
+1. Go to **Settings > Actions > General**.
+2. Under **Workflow permissions**:
+   - Select **Read and write permissions**.
+   - Check **Allow GitHub Actions to create and approve pull requests**.
+3. Click **Save**.
+
+### 4. Create the Workflow File
 
 Create `.github/workflows/antigravityci.yml` in your repository and paste the following:
 
