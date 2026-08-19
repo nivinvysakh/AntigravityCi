@@ -1,3 +1,4 @@
+# Make Sure to set the GEMINI_API_KEY secret in your repository settings for this workflow to function correctly.
 name: AntigravityCI
 
 on:

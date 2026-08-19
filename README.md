@@ -51,17 +51,22 @@ Simply tag `@antigravity refactor`, `fix`, `test`, or `doc` in any PR comment. A
 ## 🚀 Quick Start (1-Minute Setup)
 
 ### 1. Get a Free Google Gemini API Key
+
 Obtain a free API key from [Google AI Studio](https://aistudio.google.com/).
 
 ### 2. Add Secrets to your GitHub Repository
+
 Go to **Settings > Secrets and variables > Actions** and add:
+
 - `GEMINI_API_KEY`: Your Google Gemini API Key.
 
 ### 3. Create the Workflow File
+
 Create `.github/workflows/antigravityci.yml` in your repository and paste the following:
 
 ```yaml
-name: AntigravityCI PR Assistant
+# Make Sure to set the GEMINI_API_KEY secret in your repository settings for this workflow to function correctly.
+name: AntigravityCI
 
 on:
   issue_comment:
@@ -127,7 +132,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run AntigravityCI
-        uses: nivinvysakh/AntigravityCi@v1.0.0
+        uses: ./
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -141,27 +146,27 @@ jobs:
 
 Tag AntigravityCI in any Pull Request discussion with any natural instruction:
 
-| Command | Example Usage | What AntigravityCI Does |
-|---|---|---|
-| `refactor` | `@antigravity refactor optimize this async query loop` | Refactors code for performance, readability, and idiomatic style |
-| `fix` | `@antigravity fix handle edge case when token is expired` | Identifies bugs, resolves exceptions, and adds edge-case guards |
-| `test` | `@antigravity test add pytest test cases for auth module` | Generates comprehensive unit and integration test suites |
-| `doc` | `@antigravity doc add Google-style docstrings with examples` | Adds clean type annotations, docstrings, and documentation |
-| `review` | `@antigravity review check for memory leaks and race conditions` | Audits modified files and implements hardened solutions |
+| Command    | Example Usage                                                    | What AntigravityCI Does                                          |
+| ---------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `refactor` | `@antigravity refactor optimize this async query loop`           | Refactors code for performance, readability, and idiomatic style |
+| `fix`      | `@antigravity fix handle edge case when token is expired`        | Identifies bugs, resolves exceptions, and adds edge-case guards  |
+| `test`     | `@antigravity test add pytest test cases for auth module`        | Generates comprehensive unit and integration test suites         |
+| `doc`      | `@antigravity doc add Google-style docstrings with examples`     | Adds clean type annotations, docstrings, and documentation       |
+| `review`   | `@antigravity review check for memory leaks and race conditions` | Audits modified files and implements hardened solutions          |
 
 ---
 
 ## ⚙️ Action Inputs
 
-| Input | Description | Required | Default |
-|---|---|:---:|:---:|
-| `gemini_api_key` | Google Gemini API Key from Google AI Studio | **Yes** | — |
-| `github_token` | GitHub Token for API operations (`secrets.GITHUB_TOKEN`) | No | `${{ github.token }}` |
-| `model` | Gemini model name (`gemini-3.6-flash`, `gemini-3.7-flash`) | No | `"gemini-3.6-flash"` |
-| `bot_name` | Comment trigger handle | No | `"@antigravityci"` |
-| `post_ack` | Whether to post instruction replay (set `"false"` if Job 1 enabled) | No | `"true"` |
-| `max_file_size_kb` | Max individual file size in KB sent to LLM context | No | `50` |
-| `target_branch` | Target branch for generated PR (`auto` uses base of PR) | No | `"auto"` |
+| Input              | Description                                                         | Required |        Default        |
+| ------------------ | ------------------------------------------------------------------- | :------: | :-------------------: |
+| `gemini_api_key`   | Google Gemini API Key from Google AI Studio                         | **Yes**  |           —           |
+| `github_token`     | GitHub Token for API operations (`secrets.GITHUB_TOKEN`)            |    No    | `${{ github.token }}` |
+| `model`            | Gemini model name (`gemini-3.6-flash`, `gemini-3.7-flash`)          |    No    | `"gemini-3.6-flash"`  |
+| `bot_name`         | Comment trigger handle                                              |    No    |  `"@antigravityci"`   |
+| `post_ack`         | Whether to post instruction replay (set `"false"` if Job 1 enabled) |    No    |       `"true"`        |
+| `max_file_size_kb` | Max individual file size in KB sent to LLM context                  |    No    |         `50`          |
+| `target_branch`    | Target branch for generated PR (`auto` uses base of PR)             |    No    |       `"auto"`        |
 
 ---
 
@@ -209,12 +214,14 @@ sequenceDiagram
 ## 🧪 Local Development
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/nivinvysakh/AntigravityCi.git
    cd AntigravityCi
    ```
 
 2. Set up virtual environment:
+
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
