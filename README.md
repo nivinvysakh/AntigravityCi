@@ -40,12 +40,11 @@ Tag `@orbit` in any PR comment to refactor code, resolve bugs, fix failing CI bu
 
 - **♊ Google Gemini Cascade**: Native integration with `gemini-3.6-flash`, `gemini-3.7-flash`, and fallback cascades for 100% uptime.
 - **⚡ Native Node 20 Runtime**: Instant `<0.1s` VM execution without container startup overhead.
-- **🩹 Self-Healing CI (`fix-ci`)**: Reads failed GitHub Actions logs and automatically opens a patch PR fixing broken tests.
 - **💬 Inline PR Reviews**: Posts line-by-line code reviews with **one-click GitHub suggestion diff blocks**.
 - **🎨 Architecture Diagrams**: Automatically generates and embeds Mermaid diagrams in PR bodies and walkthroughs.
 - **📊 AI Quality Scorecard**: Includes automated risk levels, breaking change checks, and file modification metrics.
 - **🛡️ Security Enforcement**: Strict role authorization—only `OWNER`, `MEMBER`, or `COLLABORATOR` can trigger runs.
-- **🚫 Safe Context Filters**: Filters out lockfiles (`package-lock.json`, `poetry.lock`, `Cargo.lock`), binaries, and oversized files (>50KB).
+- **🚫 Safe Context Filters**: Filters out lockfiles (`package-lock.json`, `poetry.lock`, `Cargo.lock`), workflow files, binaries, and oversized files (>50KB).
 - **🌿 Clean Branch Isolation**: Never pushes directly to existing PR branches—always creates isolated branches for human review.
 
 ---
@@ -108,7 +107,6 @@ Tag OrbitCI in any Pull Request discussion with any natural instruction or optio
 
 | Command | Example Usage | What OrbitCI Does |
 |---|---|---|
-| `fix-ci` *(or `fixci`)* | `@orbit fix-ci` | **Self-healing CI**: Reads failed GitHub Actions logs & opens a patch PR fixing broken tests |
 | `polish-pr` *(or `polish`)* | `@orbit polish-pr enhance title and summary` | **PR Enhancer**: Rewrites PR title to conventional commits & formats rich structured description |
 | `review` | `@orbit review check for memory leaks` | **Inline Review**: Posts line-by-line review comments with **one-click GitHub commit suggestions** |
 | `explain` | `@orbit explain breakdown architectural tradeoffs` | **Architecture Breakdown**: Posts an ELI5 walkthrough with **auto-generated Mermaid diagrams** |

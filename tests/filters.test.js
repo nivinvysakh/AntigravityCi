@@ -54,7 +54,7 @@ describe('Safety Context Filters', () => {
   it('protects .github/workflows files from standard token modification', () => {
     const check = isSafeTextFile('.github/workflows/ci.yml', 100, 50);
     expect(check.safe).toBe(false);
-    expect(check.reason).toContain('Protected workflow file');
+    expect(check.reason).toContain('Ignored workflow/configuration file');
   });
 
   const validCodeFiles = [

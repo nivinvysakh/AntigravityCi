@@ -32199,9 +32199,9 @@ function isSafeTextFile(filePath, sizeBytes = 0, maxSizeKb = 50) {
   const basename = external_node_path_namespaceObject.basename(filePath).toLowerCase();
   const ext = external_node_path_namespaceObject.extname(filePath).toLowerCase();
 
-  // 1. Protect GitHub Actions workflow files (GITHUB_TOKEN cannot push changes to workflows without PAT)
-  if (normalizedPath.startsWith('.github/workflows/')) {
-    return { safe: false, reason: 'Protected workflow file (.github/workflows/*)' };
+  // 1. Ignore all GitHub Actions workflow and internal configuration files (.github/*)
+  if (normalizedPath.startsWith('.github/') || normalizedPath.includes('/.github/')) {
+    return { safe: false, reason: 'Ignored workflow/configuration file (.github/*)' };
   }
 
   // 2. Filter out lockfiles and dependency trees
@@ -33979,7 +33979,7 @@ async function callAiEngine(
  * @typedef {Object} ParsedCommand
  * @property {string} botName - Normalized bot handle found (e.g. '@orbit' or '@orbitci')
  * @property {string} rawCommand - Raw command word as typed by user
- * @property {string} command - Normalized canonical command (e.g. 'refactor', 'security', 'fix-ci')
+ * @property {string} command - Normalized canonical command (e.g. 'refactor', 'security', 'explain')
  * @property {string} instruction - Clean natural language instruction (flags stripped)
  * @property {Record<string, string|boolean>} flags - Extracted inline CLI-style flags (e.g. { model: 'gemini-3.7-flash', deep: true })
  * @property {boolean} isCommentOnly - Whether this command posts analysis directly without opening a PR
@@ -33999,12 +33999,6 @@ const COMMAND_ALIASES = {
   bugfix: 'fix',
   hotfix: 'fix',
   patch: 'fix',
-
-  // Self-Healing CI & Build Repair
-  'fix-ci': 'fix-ci',
-  fixci: 'fix-ci',
-  'ci-fix': 'fix-ci',
-  'build-fix': 'fix-ci',
 
   // PR Title & Description Polish
   'polish-pr': 'polish-pr',
@@ -34060,7 +34054,6 @@ const COMMAND_ALIASES = {
 const ACTION_VERBS = {
   refactor: 'Refactoring your code ♻️',
   fix: 'Fixing bugs & resolving issues 🐛',
-  'fix-ci': 'Diagnosing failed CI logs & generating fix 🩹',
   'polish-pr': 'Polishing PR title & description 📝',
   test: 'Generating comprehensive test suites 🧪',
   doc: 'Writing documentation & docstrings 📝',
@@ -34349,13 +34342,6 @@ async function handleComment(gh, eventData, options) {
   const prAuthor = prInfo.user?.login || 'unknown';
   const targetBranch = targetBranchInput === 'auto' ? baseBranch : targetBranchInput;
 
-  // If command is 'fix-ci', fetch failing CI check runs summary
-  let ciLogsSummary = '';
-  if (parsed.command === 'fix-ci') {
-    core.info(`Fetching failing CI check run summaries for commit SHA ${headSha}...`);
-    ciLogsSummary = await gh.getFailedCheckRunsSummary(headSha);
-  }
-
   // Checkout PR branch so workspace has latest files locally
   try {
     runGitCommand(['fetch', 'origin', `pull/${prNumber}/head:pr-${prNumber}`]);
@@ -34399,7 +34385,7 @@ async function handleComment(gh, eventData, options) {
   }
 
   if (filesContext.length === 0) {
-    let msg = `ℹ️ **OrbitCI**: No suitable text files found to process in PR #${prNumber} (all files were binary, lockfiles, deleted, or >${maxFileSizeKb}KB).`;
+    let msg = `ℹ️ **OrbitCI**: No suitable text files found to process in PR #${prNumber} (all files were binary, lockfiles, workflow files, deleted, or >${maxFileSizeKb}KB).`;
     if (ignoredFilesLog.length > 0) {
       msg += '\n\n**Ignored Files:**\n- ' + ignoredFilesLog.join('\n- ');
     }
@@ -34422,7 +34408,7 @@ async function handleComment(gh, eventData, options) {
     'You are OrbitCI, an elite AI software engineer and code reviewer.\n' +
     `Your task is to fulfill the user's PR command: '${parsed.command}' by analyzing the provided files, diffs, and instructions.\n` +
     'Rules:\n' +
-    "1. For commands that modify code ('refactor', 'fix', 'fix-ci', 'test', 'doc', 'security', 'perf', 'types'):\n" +
+    "1. For commands that modify code ('refactor', 'fix', 'test', 'doc', 'security', 'perf', 'types'):\n" +
     '   - Return complete updated file content in `modified_files` for every modified file.\n' +
     "   - Do NOT truncate code with comments like '// rest of code stays same'. Always return full working files.\n" +
     "2. For read-only analysis commands ('explain', 'changelog'):\n" +
@@ -34439,7 +34425,6 @@ async function handleComment(gh, eventData, options) {
     command: parsed.command,
     instruction: parsed.instruction,
     flags: parsed.flags,
-    ci_failure_summary: ciLogsSummary || undefined,
     pr_info: {
       number: prNumber,
       title: prTitle,

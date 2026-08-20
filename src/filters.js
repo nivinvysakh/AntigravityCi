@@ -23,9 +23,9 @@ export function isSafeTextFile(filePath, sizeBytes = 0, maxSizeKb = 50) {
   const basename = path.basename(filePath).toLowerCase();
   const ext = path.extname(filePath).toLowerCase();
 
-  // 1. Protect GitHub Actions workflow files (GITHUB_TOKEN cannot push changes to workflows without PAT)
-  if (normalizedPath.startsWith('.github/workflows/')) {
-    return { safe: false, reason: 'Protected workflow file (.github/workflows/*)' };
+  // 1. Ignore all GitHub Actions workflow and internal configuration files (.github/*)
+  if (normalizedPath.startsWith('.github/') || normalizedPath.includes('/.github/')) {
+    return { safe: false, reason: 'Ignored workflow/configuration file (.github/*)' };
   }
 
   // 2. Filter out lockfiles and dependency trees

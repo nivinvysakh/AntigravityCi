@@ -33,12 +33,6 @@ describe('Comment Command Parsing', () => {
     expect(result.command).toBe('refactor');
   });
 
-  it('parses fix-ci command', () => {
-    const result = parseCommentCommand('@antigravity fix-ci');
-    expect(result.command).toBe('fix-ci');
-    expect(result.actionVerb).toContain('Diagnosing failed CI');
-  });
-
   it('parses polish-pr command', () => {
     const result = parseCommentCommand('@antigravity polish-pr enhance title and body');
     expect(result.command).toBe('polish-pr');

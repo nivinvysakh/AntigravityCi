@@ -6,7 +6,7 @@
  * @typedef {Object} ParsedCommand
  * @property {string} botName - Normalized bot handle found (e.g. '@orbit' or '@orbitci')
  * @property {string} rawCommand - Raw command word as typed by user
- * @property {string} command - Normalized canonical command (e.g. 'refactor', 'security', 'fix-ci')
+ * @property {string} command - Normalized canonical command (e.g. 'refactor', 'security', 'explain')
  * @property {string} instruction - Clean natural language instruction (flags stripped)
  * @property {Record<string, string|boolean>} flags - Extracted inline CLI-style flags (e.g. { model: 'gemini-3.7-flash', deep: true })
  * @property {boolean} isCommentOnly - Whether this command posts analysis directly without opening a PR
@@ -26,12 +26,6 @@ export const COMMAND_ALIASES = {
   bugfix: 'fix',
   hotfix: 'fix',
   patch: 'fix',
-
-  // Self-Healing CI & Build Repair
-  'fix-ci': 'fix-ci',
-  fixci: 'fix-ci',
-  'ci-fix': 'fix-ci',
-  'build-fix': 'fix-ci',
 
   // PR Title & Description Polish
   'polish-pr': 'polish-pr',
@@ -87,7 +81,6 @@ export const COMMAND_ALIASES = {
 export const ACTION_VERBS = {
   refactor: 'Refactoring your code ♻️',
   fix: 'Fixing bugs & resolving issues 🐛',
-  'fix-ci': 'Diagnosing failed CI logs & generating fix 🩹',
   'polish-pr': 'Polishing PR title & description 📝',
   test: 'Generating comprehensive test suites 🧪',
   doc: 'Writing documentation & docstrings 📝',
