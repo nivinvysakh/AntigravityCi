@@ -1,5 +1,5 @@
-import fs from 'node:fs';
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import * as core from '@actions/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { run } from '../src/index.js';
 
 describe('End-to-End Action Execution', () => {
@@ -7,6 +7,7 @@ describe('End-to-End Action Execution', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    vi.spyOn(core, 'setFailed').mockImplementation(() => {});
   });
 
   afterEach(() => {
