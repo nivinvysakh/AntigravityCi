@@ -19,10 +19,16 @@ export function isSafeTextFile(filePath, sizeBytes = 0, maxSizeKb = 50) {
     return { safe: false, reason: 'Invalid file path' };
   }
 
+  const normalizedPath = filePath.replace(/\\/g, '/').toLowerCase();
   const basename = path.basename(filePath).toLowerCase();
   const ext = path.extname(filePath).toLowerCase();
 
-  // 1. Filter out lockfiles and dependency trees
+  // 1. Protect GitHub Actions workflow files (GITHUB_TOKEN cannot push changes to workflows without PAT)
+  if (normalizedPath.startsWith('.github/workflows/')) {
+    return { safe: false, reason: 'Protected workflow file (.github/workflows/*)' };
+  }
+
+  // 2. Filter out lockfiles and dependency trees
   if (LOCKFILES.has(basename)) {
     return { safe: false, reason: `Ignored lockfile: ${basename}` };
   }
