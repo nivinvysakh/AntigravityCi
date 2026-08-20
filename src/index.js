@@ -6,7 +6,6 @@ import fs from 'node:fs';
 import * as core from '@actions/core';
 import { GitHubClient, runGitCommand } from './github.js';
 import { handleComment } from './handlers/comment.js';
-import { handlePrClosed } from './handlers/prClosed.js';
 import { handlePrOpened } from './handlers/prOpened.js';
 
 export async function run() {

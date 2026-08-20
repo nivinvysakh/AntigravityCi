@@ -1,47 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleComment } from '../src/handlers/comment.js';
-import { handlePrClosed } from '../src/handlers/prClosed.js';
 import { handlePrOpened } from '../src/handlers/prOpened.js';
-
-describe('PR Closed Handler', () => {
-  it('cleans up AntigravityCI branch on PR close', async () => {
-    const mockGh = {
-      deleteBranch: vi.fn().mockResolvedValue(true),
-    };
-
-    const eventData = {
-      action: 'closed',
-      pull_request: {
-        number: 42,
-        head: { ref: 'antigravityci/refactor-pr42-abc123' },
-      },
-    };
-
-    const code = await handlePrClosed(mockGh, eventData);
-    expect(code).toBe(0);
-    expect(mockGh.deleteBranch).toHaveBeenCalledWith(
-      'antigravityci/refactor-pr42-abc123'
-    );
-  });
-
-  it('preserves non-bot branches on PR close', async () => {
-    const mockGh = {
-      deleteBranch: vi.fn().mockResolvedValue(true),
-    };
-
-    const eventData = {
-      action: 'closed',
-      pull_request: {
-        number: 42,
-        head: { ref: 'feature/user-custom-branch' },
-      },
-    };
-
-    const code = await handlePrClosed(mockGh, eventData);
-    expect(code).toBe(0);
-    expect(mockGh.deleteBranch).not.toHaveBeenCalled();
-  });
-});
 
 describe('PR Opened Handler', () => {
   it('assigns and requests review from repo owner on PR open', async () => {
