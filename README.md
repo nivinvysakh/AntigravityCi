@@ -1,26 +1,22 @@
-<img src="https://ico.hugeicons.com/google-gemini-solid-rounded-512.webp" alt="OrbitCI Logo" width="120" align="right" />
+<div align="center">
 
-### 🪐 OrbitCI
-
-### Autonomous AI PR Assistant · Powered by Google Gemini ♊
+# 🪐 OrbitCI
+### Autonomous AI Pull Request Assistant · Powered by Google Gemini ♊
 
 [![Google Gemini](https://img.shields.io/badge/Google%20Gemini-8E75FF?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/features/actions)
+[![Node.js 20](https://img.shields.io/badge/Node.js-20.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F1C40F?style=for-the-badge)](LICENSE)
 
-**OrbitCI** is an autonomous AI pair-programming assistant that lives directly inside your GitHub Pull Requests.
+**OrbitCI** is an autonomous AI developer assistant that lives directly inside your GitHub Pull Requests.
 
-Simply tag `@orbit refactor`, `fix`, `security`, `perf`, `explain`, `test`, or `polish-pr` in any PR comment. OrbitCI will instantly acknowledge receipt (<0.2s), analyze code diffs with Google Gemini, and open a ready-to-merge Pull Request with an automated risk scorecard.
+Tag `@orbit` in any PR comment to refactor code, resolve bugs, fix failing CI builds, conduct inline reviews, or generate architectural walkthroughs—all delivered in seconds.
 
-<br clear="right" />
+</div>
 
 ---
 
-## 🎬 How It Works
-
-<img src="Assets/images/demo.gif" width="600" alt="Workflow Demo"/>
-
-<br>
+## ⚡ How It Works
 
 ```text
 1. Developer comments on a PR:
@@ -28,7 +24,7 @@ Simply tag `@orbit refactor`, `fix`, `security`, `perf`, `explain`, `test`, or `
 
 2. OrbitCI reacts instantly:
    👍 Reacts +1 to comment in <0.2s
-   💬 Replies immediately with instruction replay
+   💬 Posts instant instruction replay
 
 3. OrbitCI executes in the background:
    🧠 Analyzes PR file diffs with Google Gemini (3.6 / 3.7 Flash)
@@ -40,35 +36,31 @@ Simply tag `@orbit refactor`, `fix`, `security`, `perf`, `explain`, `test`, or `
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-- **♊ Google Gemini Powered**: Native integration with Google Gemini 3.6 & 3.7 Flash models with automated multi-model cascade fallbacks for 100% uptime.
-- **⚡ Native Node 20 Runtime**: Instant `<0.1s` VM execution without container overhead.
-- **🩹 Self-Healing CI (`fix-ci`)**: Automatically reads failing test logs from GitHub Actions and generates a fix PR.
-- **💬 Inline Code Reviews**: Line-by-line PR reviews with one-click GitHub suggestion diff blocks.
+- **♊ Google Gemini Cascade**: Native integration with `gemini-3.6-flash`, `gemini-3.7-flash`, and fallback cascades for 100% uptime.
+- **⚡ Native Node 20 Runtime**: Instant `<0.1s` VM execution without container startup overhead.
+- **🩹 Self-Healing CI (`fix-ci`)**: Reads failed GitHub Actions logs and automatically opens a patch PR fixing broken tests.
+- **💬 Inline PR Reviews**: Posts line-by-line code reviews with **one-click GitHub suggestion diff blocks**.
 - **🎨 Architecture Diagrams**: Automatically generates and embeds Mermaid diagrams in PR bodies and walkthroughs.
-- **🛡️ Built-in Security Authorization**: Enforces strict repository permission checks—only authorized collaborators (`OWNER`, `MEMBER`, `COLLABORATOR`) can trigger runs.
-- **🚫 Safe Context Filters**: Automatically filters out lockfiles (`package-lock.json`, `poetry.lock`, `Cargo.lock`, etc.), binary assets, and oversized files (>50KB).
-- **🌿 Clean Branch Isolation**: Never modifies existing PR branches or commits directly to `main`—always creates a clean, isolated branch and PR for human review.
+- **📊 AI Quality Scorecard**: Includes automated risk levels, breaking change checks, and file modification metrics.
+- **🛡️ Security Enforcement**: Strict role authorization—only `OWNER`, `MEMBER`, or `COLLABORATOR` can trigger runs.
+- **🚫 Safe Context Filters**: Filters out lockfiles (`package-lock.json`, `poetry.lock`, `Cargo.lock`), binaries, and oversized files (>50KB).
+- **🌿 Clean Branch Isolation**: Never pushes directly to existing PR branches—always creates isolated branches for human review.
 
 ---
 
 ## 🚀 Quick Start (1-Minute Setup)
 
 ### 1. Get a Free Google Gemini API Key
-
 Obtain a free API key from [Google AI Studio](https://aistudio.google.com/).
 
-### 2. Add Secrets to your GitHub Repository
-
+### 2. Add Secret to your GitHub Repository
 Go to **Settings > Secrets and variables > Actions** and add:
-
 - `GEMINI_API_KEY`: Your Google Gemini API Key.
 
 ### 3. Enable Workflow Permissions (Important ⚠️)
-
 To allow OrbitCI to push refactored code and open Pull Requests:
-
 1. Go to **Settings > Actions > General**.
 2. Under **Workflow permissions**:
    - Select **Read and write permissions**.
@@ -76,11 +68,10 @@ To allow OrbitCI to push refactored code and open Pull Requests:
 3. Click **Save**.
 
 ### 4. Create the Workflow File
-
 Create `.github/workflows/orbitci.yml` in your repository:
 
 ```yaml
-# Make Sure to set the GEMINI_API_KEY secret in your repository settings for this workflow to function correctly.
+# Make sure to set the GEMINI_API_KEY secret in your repository settings
 name: OrbitCI
 
 on:
@@ -138,8 +129,8 @@ Customize AI behavior directly in your PR comments:
 @orbit perf optimize db queries --model=gemini-3.7-flash --deep
 ```
 
-- `--model=<name>`: Override default Gemini model (e.g. `gemini-3.7-flash`, `gemini-3.6-flash`)
-- `--deep`: Instructs the model to perform deeper multi-step architectural reasoning
+- `--model=<name>`: Override default Gemini model (e.g. `gemini-3.7-flash`, `gemini-3.6-flash`).
+- `--deep`: Instructs the model to perform deeper multi-step architectural reasoning.
 
 ---
 
@@ -208,13 +199,9 @@ sequenceDiagram
 
 ## 🛡️ Security & Safety Model
 
-1. **Role Enforcement**:
-   - Only users with `author_association` of `OWNER`, `MEMBER`, or `COLLABORATOR` can invoke OrbitCI. Comments from unauthorized users are safely ignored.
-2. **Context Safety**:
-   - Lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `poetry.lock`, etc.) are filtered out to prevent context bloat.
-   - Binary assets and oversized files (>50KB) are skipped automatically.
-3. **Branch Isolation**:
-   - OrbitCI never pushes directly to existing PR branches or protected branches. It always creates a fresh, isolated branch and opens a new Pull Request for human review.
+1. **Role Enforcement**: Only users with `author_association` of `OWNER`, `MEMBER`, or `COLLABORATOR` can invoke OrbitCI. Comments from unauthorized users are safely ignored.
+2. **Context Safety**: Lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `Cargo.lock`, `poetry.lock`, etc.), binary assets, and oversized files (>50KB) are skipped automatically.
+3. **Branch Isolation**: OrbitCI never pushes directly to existing PR branches or protected branches. It always creates a fresh, isolated branch and opens a new Pull Request for human review.
 
 ---
 
