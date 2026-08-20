@@ -18,6 +18,10 @@ Simply tag `@antigravity refactor`, `fix`, `test`, or `doc` in any PR comment. A
 
 ## 🎬 How It Works
 
+<img src="assets/images/demo.gif" width="600" alt="Workflow Demo"/>
+
+<br>
+
 ```text
 1. Developer comments on a PR:
    @antigravity refactor optimize this async query loop and eliminate redundant DB calls
