@@ -33,13 +33,16 @@ function renderScorecard(riskLevel, breakingChanges, filesCount) {
     ? '⚠️ **Yes (Breaking)**'
     : '✅ **None (Backward Compatible)**';
 
+  const filesBadge =
+    filesCount > 0 ? `\`${filesCount} file(s)\`` : '`0 (Analysis Only)`';
+
   return (
     '### 📊 AI Quality & Risk Scorecard\n\n' +
     '| Metric | Assessment |\n' +
     '|---|---|\n' +
     `| 🛡️ **Risk Level** | ${riskBadge} |\n` +
     `| ⚠️ **Breaking Changes** | ${breakingBadge} |\n` +
-    `| 📁 **Files Changed** | \`${filesCount} file(s)\` |\n`
+    `| 📁 **Files Changed** | ${filesBadge} |\n`
   );
 }
 
@@ -143,14 +146,15 @@ export async function handleComment(gh, eventData, options) {
     `Triggered by @${commentAuthor} (${authorAssociation}) on PR #${prNumber}: command='${parsed.command}', instruction='${parsed.instruction}', model='${activeModelName}'`
   );
 
+  const cleanReplayText = `${parsed.botName} ${parsed.command} ${parsed.instruction}`.trim();
+
   // 4. Acknowledge with thumbs-up reaction and instant replay comment
   await gh.addCommentReaction(commentId, '+1');
 
   if (postAck) {
-    const replayText = `@${botName.replace(/^@/, '')} ${parsed.command} ${parsed.instruction}`.trim();
     const ackMessage =
       `🤖 **AntigravityCI**: ${parsed.actionVerb} for @${commentAuthor}!\n\n` +
-      `> 💬 **Instruction Replay:** \`${replayText}\`\n\n` +
+      `> 💬 **Instruction Replay:** \`${cleanReplayText}\`\n\n` +
       `⏳ Analyzing PR #${prNumber} modified files with Google Gemini (${activeModelName}). Generating response...`;
 
     await gh.createIssueComment(prNumber, ackMessage);
@@ -317,7 +321,7 @@ export async function handleComment(gh, eventData, options) {
         aiResponse.breaking_changes || false,
         filesContext.length
       ) +
-      `\n\n---\n*Polished by [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi) via ${engineUsed}.*`;
+      `\n\n---\n*Polished by [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi) via \`${engineUsed}\`.*`;
 
     await gh.updatePullRequest(prNumber, {
       title: polishedTitle,
@@ -376,11 +380,11 @@ export async function handleComment(gh, eventData, options) {
     Array.isArray(aiResponse.modified_files) &&
     aiResponse.modified_files.length > 0;
 
-  // Feature 3: Comment-Only Mode (e.g. '@antigravity explain' or read-only analysis)
+  // Feature 3: Comment-Only Mode (e.g. '@antigravity explain', 'changelog', or read-only analysis)
   if (parsed.isCommentOnly || !hasModifiedFiles) {
     const analysisComment =
       `## 💡 AntigravityCI: \`${parsed.command}\` Analysis\n\n` +
-      `> 💬 **Instruction:** \`${parsed.botName} ${parsed.command} ${parsed.instruction}\`\n\n` +
+      `> 💬 **Instruction:** \`${cleanReplayText}\`\n\n` +
       renderScorecard(
         aiResponse.risk_level || 'LOW',
         aiResponse.breaking_changes || false,
@@ -389,7 +393,7 @@ export async function handleComment(gh, eventData, options) {
       renderDiagram(aiResponse.diagram) +
       `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
       `### 🔍 Detailed Explanation & Findings\n${aiResponse.explanation}\n\n` +
-      `---\n*Generated with 🧠 [${engineUsed}](https://github.com/${gh.repository}) via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
+      `---\n*Generated with 🧠 \`${engineUsed}\` via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
 
     await gh.createIssueComment(prNumber, analysisComment);
     core.info('AntigravityCI comment analysis posted successfully!');
@@ -434,11 +438,10 @@ export async function handleComment(gh, eventData, options) {
     core.info(`Pushed branch ${newBranchName} to origin.`);
 
     // Open a new Pull Request with AI Scorecard & Mermaid Diagram
-    const repoSlug = gh.repository;
     const formattedBody =
       `## 🤖 AntigravityCI: \`${parsed.command}\`\n\n` +
       `Triggered by @${commentAuthor} on original PR #${prNumber} ([comment](${commentHtmlUrl})):\n` +
-      `> \`${parsed.botName} ${parsed.command} ${parsed.instruction}\`\n\n` +
+      `> \`${cleanReplayText}\`\n\n` +
       renderScorecard(
         aiResponse.risk_level || 'LOW',
         aiResponse.breaking_changes || false,
@@ -449,7 +452,7 @@ export async function handleComment(gh, eventData, options) {
       `### 🔍 Detailed Explanation\n${aiResponse.explanation}\n\n` +
       `### 📁 Modified Files (${changedPaths.length})\n` +
       changedPaths.map((p) => `- \`${p}\``).join('\n') +
-      `\n\n---\n*Generated with 🧠 [${engineUsed}](https://github.com/${repoSlug}) via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
+      `\n\n---\n*Generated with 🧠 \`${engineUsed}\` via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
 
     const newPr = await gh.createPullRequest({
       title: aiResponse.pr_title || `[antigravityci] ${parsed.command} on PR #${prNumber}`,
