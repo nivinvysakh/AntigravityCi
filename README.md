@@ -18,7 +18,7 @@ Simply tag `@antigravity refactor`, `fix`, `test`, or `doc` in any PR comment. A
 
 ## 🎬 How It Works
 
-<img src="assets/images/demo.gif" width="600" alt="Workflow Demo"/>
+<img src="Assets/images/demo.gif" width="600" alt="Workflow Demo"/>
 
 <br>
 
