@@ -1,5 +1,5 @@
 /**
- * AntigravityCI - PR Opened Event Handler
+ * OrbitCI - PR Opened Event Handler
  */
 
 import * as core from '@actions/core';

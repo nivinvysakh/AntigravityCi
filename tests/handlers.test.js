@@ -76,9 +76,9 @@ describe('PR Comment Security & Trigger Checks', () => {
       issue: { number: 5, pull_request: {} },
       comment: {
         id: 123,
-        body: '@antigravity refactor loop',
+        body: '@orbit refactor loop',
         author_association: 'OWNER',
-        user: { login: 'antigravityci[bot]', type: 'Bot' },
+        user: { login: 'orbitci[bot]', type: 'Bot' },
       },
     };
 

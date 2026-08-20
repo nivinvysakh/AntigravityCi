@@ -1,5 +1,5 @@
 /**
- * AntigravityCI - PR Comment Event Handler
+ * OrbitCI - PR Comment Event Handler
  */
 
 import crypto from 'node:crypto';
@@ -71,7 +71,7 @@ function renderDiagram(diagram) {
  * @param {Object} options
  * @param {string} [options.geminiApiKey]
  * @param {string} [options.modelName='gemini-3.6-flash']
- * @param {string} [options.botName='@antigravityci']
+ * @param {string} [options.botName='@orbitci']
  * @param {boolean} [options.postAck=true]
  * @param {number} [options.maxFileSizeKb=50]
  * @param {string} [options.targetBranchInput='auto']
@@ -82,7 +82,7 @@ export async function handleComment(gh, eventData, options) {
   const {
     geminiApiKey,
     modelName: defaultModelName = 'gemini-3.6-flash',
-    botName = '@antigravityci',
+    botName = '@orbitci',
     postAck = true,
     maxFileSizeKb = 50,
     targetBranchInput = 'auto',
@@ -98,7 +98,7 @@ export async function handleComment(gh, eventData, options) {
   }
 
   if (!issue.pull_request) {
-    core.info('Comment is on an Issue, not a Pull Request. Skipping AntigravityCI.');
+    core.info('Comment is on an Issue, not a Pull Request. Skipping OrbitCI.');
     return 0;
   }
 
@@ -111,10 +111,12 @@ export async function handleComment(gh, eventData, options) {
   const commentHtmlUrl = comment.html_url || '';
 
   // 1. Ignore bot-authored comments to prevent infinite loops
+  const lowerAuthor = commentAuthor.toLowerCase();
   if (
     commentAuthorType === 'Bot' ||
     commentAuthor.endsWith('[bot]') ||
-    commentAuthor.toLowerCase() === 'antigravityci'
+    lowerAuthor === 'orbitci' ||
+    lowerAuthor === 'antigravityci'
   ) {
     core.info(`Comment author '${commentAuthor}' is a bot. Ignoring to prevent loop.`);
     return 0;
@@ -125,7 +127,7 @@ export async function handleComment(gh, eventData, options) {
     core.warning(
       `Security: User '${commentAuthor}' has role '${authorAssociation}'. Only ${Array.from(
         AUTHORIZED_ROLES
-      ).join(', ')} can trigger AntigravityCI. Ignoring.`
+      ).join(', ')} can trigger OrbitCI. Ignoring.`
     );
     return 0;
   }
@@ -153,7 +155,7 @@ export async function handleComment(gh, eventData, options) {
 
   if (postAck) {
     const ackMessage =
-      `🤖 **AntigravityCI**: ${parsed.actionVerb} for @${commentAuthor}!\n\n` +
+      `🤖 **OrbitCI**: ${parsed.actionVerb} for @${commentAuthor}!\n\n` +
       `> 💬 **Instruction Replay:** \`${cleanReplayText}\`\n\n` +
       `⏳ Analyzing PR #${prNumber} modified files with Google Gemini (${activeModelName}). Generating response...`;
 
@@ -170,7 +172,7 @@ export async function handleComment(gh, eventData, options) {
     core.error(`Failed to fetch PR #${prNumber} metadata: ${err.message}`);
     await gh.createIssueComment(
       prNumber,
-      `⚠️ **AntigravityCI Error**: Unable to fetch PR #${prNumber} metadata or files.\n\`\`\`\n${err.message}\n\`\`\``
+      `⚠️ **OrbitCI Error**: Unable to fetch PR #${prNumber} metadata or files.\n\`\`\`\n${err.message}\n\`\`\``
     );
     return 1;
   }
@@ -232,7 +234,7 @@ export async function handleComment(gh, eventData, options) {
   }
 
   if (filesContext.length === 0) {
-    let msg = `ℹ️ **AntigravityCI**: No suitable text files found to process in PR #${prNumber} (all files were binary, lockfiles, deleted, or >${maxFileSizeKb}KB).`;
+    let msg = `ℹ️ **OrbitCI**: No suitable text files found to process in PR #${prNumber} (all files were binary, lockfiles, deleted, or >${maxFileSizeKb}KB).`;
     if (ignoredFilesLog.length > 0) {
       msg += '\n\n**Ignored Files:**\n- ' + ignoredFilesLog.join('\n- ');
     }
@@ -240,7 +242,7 @@ export async function handleComment(gh, eventData, options) {
     return 0;
   }
 
-  // 7. Load custom team rules from .antigravity.json if present
+  // 7. Load custom team rules from .orbitci.json / .orbit.json / .antigravity.json
   const projectConfig = loadProjectConfig();
   let customRulesText = '';
   if (projectConfig?.rules?.length) {
@@ -252,7 +254,7 @@ export async function handleComment(gh, eventData, options) {
 
   // 8. Construct prompt for AI Engine
   const systemInstruction =
-    'You are AntigravityCI, an elite AI software engineer and code reviewer.\n' +
+    'You are OrbitCI, an elite AI software engineer and code reviewer.\n' +
     `Your task is to fulfill the user's PR command: '${parsed.command}' by analyzing the provided files, diffs, and instructions.\n` +
     'Rules:\n' +
     "1. For commands that modify code ('refactor', 'fix', 'fix-ci', 'test', 'doc', 'security', 'perf', 'types'):\n" +
@@ -305,7 +307,7 @@ export async function handleComment(gh, eventData, options) {
     core.error(`AI generation failed: ${err.message}`);
     await gh.createIssueComment(
       prNumber,
-      `❌ **AntigravityCI Error**: AI generation failed.\n\`\`\`\n${err.message}\n\`\`\``
+      `❌ **OrbitCI Error**: AI generation failed.\n\`\`\`\n${err.message}\n\`\`\``
     );
     return 1;
   }
@@ -321,7 +323,7 @@ export async function handleComment(gh, eventData, options) {
         aiResponse.breaking_changes || false,
         filesContext.length
       ) +
-      `\n\n---\n*Polished by [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi) via \`${engineUsed}\`.*`;
+      `\n\n---\n*Polished by [OrbitCI](https://github.com/${gh.repository}) via \`${engineUsed}\`.*`;
 
     await gh.updatePullRequest(prNumber, {
       title: polishedTitle,
@@ -330,7 +332,7 @@ export async function handleComment(gh, eventData, options) {
 
     await gh.createIssueComment(
       prNumber,
-      `✨ **AntigravityCI**: Successfully polished PR #${prNumber}!\n\n` +
+      `✨ **OrbitCI**: Successfully polished PR #${prNumber}!\n\n` +
         `- **New Title:** \`${polishedTitle}\`\n` +
         `- **Updated Description:** Enhanced with structured breakdown and risk metrics.`
     );
@@ -357,7 +359,7 @@ export async function handleComment(gh, eventData, options) {
     });
 
     const reviewHeader =
-      `## 🔍 AntigravityCI Code Review\n\n` +
+      `## 🔍 OrbitCI Code Review\n\n` +
       renderScorecard(
         aiResponse.risk_level || 'LOW',
         aiResponse.breaking_changes || false,
@@ -380,10 +382,10 @@ export async function handleComment(gh, eventData, options) {
     Array.isArray(aiResponse.modified_files) &&
     aiResponse.modified_files.length > 0;
 
-  // Feature 3: Comment-Only Mode (e.g. '@antigravity explain', 'changelog', or read-only analysis)
+  // Feature 3: Comment-Only Mode (e.g. '@orbit explain', 'changelog', or read-only analysis)
   if (parsed.isCommentOnly || !hasModifiedFiles) {
     const analysisComment =
-      `## 💡 AntigravityCI: \`${parsed.command}\` Analysis\n\n` +
+      `## 💡 OrbitCI: \`${parsed.command}\` Analysis\n\n` +
       `> 💬 **Instruction:** \`${cleanReplayText}\`\n\n` +
       renderScorecard(
         aiResponse.risk_level || 'LOW',
@@ -393,17 +395,17 @@ export async function handleComment(gh, eventData, options) {
       renderDiagram(aiResponse.diagram) +
       `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
       `### 🔍 Detailed Explanation & Findings\n${aiResponse.explanation}\n\n` +
-      `---\n*Generated with 🧠 \`${engineUsed}\` via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
+      `---\n*Generated with 🧠 \`${engineUsed}\` via [OrbitCI](https://github.com/${gh.repository}).*`;
 
     await gh.createIssueComment(prNumber, analysisComment);
-    core.info('AntigravityCI comment analysis posted successfully!');
+    core.info('OrbitCI comment analysis posted successfully!');
     return 0;
   }
 
   // Feature 1: Code Modifying Commands & Self-Healing Fix-CI PRs
   const shortId = crypto.randomBytes(3).toString('hex');
   const cleanCmd = parsed.command.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
-  const newBranchName = `antigravityci/${cleanCmd}-pr${prNumber}-${shortId}`;
+  const newBranchName = `orbitci/${cleanCmd}-pr${prNumber}-${shortId}`;
 
   try {
     runGitCommand(['checkout', '-b', newBranchName]);
@@ -439,7 +441,7 @@ export async function handleComment(gh, eventData, options) {
 
     // Open a new Pull Request with AI Scorecard & Mermaid Diagram
     const formattedBody =
-      `## 🤖 AntigravityCI: \`${parsed.command}\`\n\n` +
+      `## 🤖 OrbitCI: \`${parsed.command}\`\n\n` +
       `Triggered by @${commentAuthor} on original PR #${prNumber} ([comment](${commentHtmlUrl})):\n` +
       `> \`${cleanReplayText}\`\n\n` +
       renderScorecard(
@@ -452,10 +454,10 @@ export async function handleComment(gh, eventData, options) {
       `### 🔍 Detailed Explanation\n${aiResponse.explanation}\n\n` +
       `### 📁 Modified Files (${changedPaths.length})\n` +
       changedPaths.map((p) => `- \`${p}\``).join('\n') +
-      `\n\n---\n*Generated with 🧠 \`${engineUsed}\` via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
+      `\n\n---\n*Generated with 🧠 \`${engineUsed}\` via [OrbitCI](https://github.com/${gh.repository}).*`;
 
     const newPr = await gh.createPullRequest({
-      title: aiResponse.pr_title || `[antigravityci] ${parsed.command} on PR #${prNumber}`,
+      title: aiResponse.pr_title || `[orbitci] ${parsed.command} on PR #${prNumber}`,
       body: formattedBody,
       head: newBranchName,
       base: targetBranch,
@@ -467,10 +469,10 @@ export async function handleComment(gh, eventData, options) {
 
     // Request review & assign repo owner + original comment author
     const reviewers = new Set();
-    if (repoOwner && repoOwner.toLowerCase() !== 'antigravityci') {
+    if (repoOwner && !['orbitci', 'antigravityci'].includes(repoOwner.toLowerCase())) {
       reviewers.add(repoOwner);
     }
-    if (commentAuthor && commentAuthor.toLowerCase() !== 'antigravityci') {
+    if (commentAuthor && !['orbitci', 'antigravityci'].includes(commentAuthor.toLowerCase())) {
       reviewers.add(commentAuthor);
     }
 
@@ -482,7 +484,7 @@ export async function handleComment(gh, eventData, options) {
 
     // Post confirmation comment to original PR thread
     const commentMsg =
-      `🚀 **AntigravityCI**: Successfully processed \`${parsed.command}\`!\n\n` +
+      `🚀 **OrbitCI**: Successfully processed \`${parsed.command}\`!\n\n` +
       `**New Pull Request:** [#${newPrNumber} - ${aiResponse.pr_title}](${newPrUrl})\n\n` +
       `**Summary:** ${aiResponse.summary}\n\n` +
       `**Risk Assessment:** ${aiResponse.risk_level || 'LOW'}\n\n` +
@@ -490,13 +492,13 @@ export async function handleComment(gh, eventData, options) {
       changedPaths.map((p) => `- \`${p}\``).join('\n');
 
     await gh.createIssueComment(prNumber, commentMsg);
-    core.info('AntigravityCI completed successfully!');
+    core.info('OrbitCI completed successfully!');
     return 0;
   } catch (err) {
-    core.error(`AntigravityCI execution failed: ${err.message}`);
+    core.error(`OrbitCI execution failed: ${err.message}`);
     await gh.createIssueComment(
       prNumber,
-      `❌ **AntigravityCI Error**: An unexpected error occurred.\n\`\`\`\n${err.message}\n\`\`\``
+      `❌ **OrbitCI Error**: An unexpected error occurred.\n\`\`\`\n${err.message}\n\`\`\``
     );
     return 1;
   }

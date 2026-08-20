@@ -1,5 +1,5 @@
 /**
- * AntigravityCI - GitHub API Client & Git Operations
+ * OrbitCI - GitHub API Client & Git Operations
  */
 
 import { execFileSync } from 'node:child_process';

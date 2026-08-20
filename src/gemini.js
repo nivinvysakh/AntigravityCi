@@ -1,5 +1,5 @@
 /**
- * AntigravityCI - Google Gemini Cascade Engine
+ * OrbitCI - Google Gemini Cascade Engine
  */
 
 import * as core from '@actions/core';

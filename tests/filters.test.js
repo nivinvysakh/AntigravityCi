@@ -71,7 +71,7 @@ describe('Safe File Reader', () => {
   it('reads existing valid text file', () => {
     const content = readFileSafely('package.json', 50);
     expect(content).not.toBeNull();
-    expect(content).toContain('antigravityci');
+    expect(content).toContain('orbitci');
   });
 
   it('returns null for nonexistent file', () => {

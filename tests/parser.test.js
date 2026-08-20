@@ -12,12 +12,25 @@ describe('Flags Extraction', () => {
 });
 
 describe('Comment Command Parsing', () => {
-  it('parses basic command without instruction', () => {
-    const result = parseCommentCommand('@antigravityci refactor');
+  it('parses basic command with @orbitci', () => {
+    const result = parseCommentCommand('@orbitci refactor');
     expect(result).not.toBeNull();
     expect(result.command).toBe('refactor');
     expect(result.instruction).toBe('');
     expect(result.isCommentOnly).toBe(false);
+  });
+
+  it('parses basic command with @orbit', () => {
+    const result = parseCommentCommand('@orbit perf optimize loop');
+    expect(result).not.toBeNull();
+    expect(result.command).toBe('perf');
+    expect(result.instruction).toBe('optimize loop');
+  });
+
+  it('parses backward compatible command with @antigravityci', () => {
+    const result = parseCommentCommand('@antigravityci refactor');
+    expect(result).not.toBeNull();
+    expect(result.command).toBe('refactor');
   });
 
   it('parses fix-ci command', () => {

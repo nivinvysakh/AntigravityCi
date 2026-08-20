@@ -1,4 +1,4 @@
-name: "AntigravityCI"
+name: "OrbitCI"
 description: "Autonomous AI PR Assistant powered by Google Gemini ♊."
 author: "NivinVysakh"
 branding:
@@ -20,9 +20,9 @@ inputs:
   bot_name:
     description: "Trigger handle for the bot in comments"
     required: false
-    default: "@antigravityci"
+    default: "@orbitci"
   post_ack:
-    description: "Whether to post the initial instruction replay comment (set false if handled by fast acknowledge job)"
+    description: "Whether to post the initial instruction replay comment"
     required: false
     default: "true"
   max_file_size_kb:

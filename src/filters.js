@@ -1,5 +1,5 @@
 /**
- * AntigravityCI - Safety & Context Filtering
+ * OrbitCI - Safety & Context Filtering
  */
 
 import fs from 'node:fs';

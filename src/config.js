@@ -1,5 +1,5 @@
 /**
- * AntigravityCI - Configuration and Constants
+ * OrbitCI - Configuration and Constants
  */
 
 // Security: Allowed GitHub author associations

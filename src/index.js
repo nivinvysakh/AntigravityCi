@@ -1,5 +1,5 @@
 /**
- * AntigravityCI - Main Action Entrypoint
+ * OrbitCI - Main Action Entrypoint
  */
 
 import fs from 'node:fs';
@@ -18,7 +18,7 @@ export async function run() {
     const githubRepository = process.env.GITHUB_REPOSITORY;
     const githubEventPath = process.env.GITHUB_EVENT_PATH;
     const modelName = core.getInput('model') || 'gemini-3.6-flash';
-    const botName = core.getInput('bot_name') || '@antigravityci';
+    const botName = core.getInput('bot_name') || '@orbitci';
     const postAckInput = core.getInput('post_ack') || 'true';
     const postAck = postAckInput.toLowerCase() === 'true' || postAckInput === '1';
     const maxFileSizeKb = parseInt(
@@ -49,12 +49,12 @@ export async function run() {
     try {
       const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
       runGitCommand(['config', '--global', '--add', 'safe.directory', workspace]);
-      runGitCommand(['config', '--global', 'user.name', 'AntigravityCI[bot]']);
+      runGitCommand(['config', '--global', 'user.name', 'OrbitCI[bot]']);
       runGitCommand([
         'config',
         '--global',
         'user.email',
-        'antigravityci[bot]@users.noreply.github.com',
+        'orbitci[bot]@users.noreply.github.com',
       ]);
     } catch (gitConfigErr) {
       core.warning(`Failed to set git config: ${gitConfigErr.message}`);
@@ -76,19 +76,13 @@ export async function run() {
     const comment = eventData.comment;
     const issue = eventData.issue;
 
-    // Case 1: Pull Request Closed -> Clean up branches
-    if (pullRequest && action === 'closed') {
-      const code = await handlePrClosed(gh, eventData);
-      return code;
-    }
-
-    // Case 2: Pull Request Opened -> Assign Reviewers
+    // Case 1: Pull Request Opened -> Assign Reviewers
     if (pullRequest && action === 'opened') {
       const code = await handlePrOpened(gh, eventData, repoOwner);
       return code;
     }
 
-    // Case 3: Issue Comment on a PR -> Execute AI Assistant
+    // Case 2: Issue Comment on a PR -> Execute AI Assistant
     if (comment && issue) {
       const code = await handleComment(gh, eventData, {
         geminiApiKey,
@@ -102,10 +96,10 @@ export async function run() {
       return code;
     }
 
-    core.info(`Unhandled event action '${action}'. Skipping AntigravityCI.`);
+    core.info(`Unhandled event action '${action}'. Skipping OrbitCI.`);
     return 0;
   } catch (err) {
-    core.setFailed(`AntigravityCI failed with error: ${err.message}`);
+    core.setFailed(`OrbitCI failed with error: ${err.message}`);
     return 1;
   }
 }

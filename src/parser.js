@@ -1,10 +1,10 @@
 /**
- * AntigravityCI - PR Comment Command & Flags Parser
+ * OrbitCI - PR Comment Command & Flags Parser
  */
 
 /**
  * @typedef {Object} ParsedCommand
- * @property {string} botName - Normalized bot handle found (e.g. '@antigravity' or '@antigravityci')
+ * @property {string} botName - Normalized bot handle found (e.g. '@orbit' or '@orbitci')
  * @property {string} rawCommand - Raw command word as typed by user
  * @property {string} command - Normalized canonical command (e.g. 'refactor', 'security', 'fix-ci')
  * @property {string} instruction - Clean natural language instruction (flags stripped)
@@ -126,10 +126,10 @@ export function extractFlags(text) {
  * Parse an issue / PR comment body to extract bot commands, instructions, and flags.
  *
  * @param {string} body - The raw comment body
- * @param {string} [botName='@antigravityci'] - The default or configured bot name
+ * @param {string} [botName='@orbitci'] - The default or configured bot name
  * @returns {ParsedCommand|null} Parsed command object or null if not triggered
  */
-export function parseCommentCommand(body, botName = '@antigravityci') {
+export function parseCommentCommand(body, botName = '@orbitci') {
   if (!body || typeof body !== 'string') {
     return null;
   }
@@ -139,10 +139,12 @@ export function parseCommentCommand(body, botName = '@antigravityci') {
     return null;
   }
 
-  // Generate bot aliases: configured botName, @antigravity, and @antigravityci
+  // Generate bot aliases: configured botName, @orbit, @orbitci, @antigravity, @antigravityci
   const cleanTarget = botName.replace(/^@/, '');
   const handles = new Set([
     cleanTarget.toLowerCase(),
+    'orbit',
+    'orbitci',
     'antigravity',
     'antigravityci',
   ]);

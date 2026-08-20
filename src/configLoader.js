@@ -1,5 +1,5 @@
 /**
- * AntigravityCI - Project Configuration Loader
+ * OrbitCI - Project Configuration Loader
  */
 
 import fs from 'node:fs';
@@ -7,7 +7,7 @@ import path from 'node:path';
 import * as core from '@actions/core';
 
 /**
- * @typedef {Object} AntigravityConfig
+ * @typedef {Object} OrbitConfig
  * @property {string[]} [rules] - Custom project rules or conventions
  * @property {string} [styleGuide] - Preferred coding style or linter rules
  * @property {string} [language] - Primary programming language
@@ -15,21 +15,29 @@ import * as core from '@actions/core';
  */
 
 /**
- * Load optional .antigravity.json or .antigravity.yml configuration from the workspace root.
+ * Load optional .orbitci.json, .orbit.json, or .antigravity.json configuration from workspace.
  *
  * @param {string} [workspace=process.cwd()] - Path to repository workspace
- * @returns {AntigravityConfig|null} Loaded config or null if not found
+ * @returns {OrbitConfig|null} Loaded config or null if not found
  */
 export function loadProjectConfig(workspace = process.cwd()) {
-  const jsonPath = path.join(workspace, '.antigravity.json');
-  if (fs.existsSync(jsonPath)) {
-    try {
-      const raw = fs.readFileSync(jsonPath, 'utf-8');
-      const parsed = JSON.parse(raw);
-      core.info('Loaded custom project rules from .antigravity.json');
-      return parsed;
-    } catch (err) {
-      core.warning(`Failed to parse .antigravity.json: ${err.message}`);
+  const configFiles = [
+    '.orbitci.json',
+    '.orbit.json',
+    '.antigravity.json',
+  ];
+
+  for (const filename of configFiles) {
+    const jsonPath = path.join(workspace, filename);
+    if (fs.existsSync(jsonPath)) {
+      try {
+        const raw = fs.readFileSync(jsonPath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        core.info(`Loaded custom project rules from ${filename}`);
+        return parsed;
+      } catch (err) {
+        core.warning(`Failed to parse ${filename}: ${err.message}`);
+      }
     }
   }
 
