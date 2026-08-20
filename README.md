@@ -87,6 +87,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      workflows: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

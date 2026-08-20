@@ -34753,7 +34753,7 @@ async function run() {
       ? githubRepository.split('/')[0]
       : '';
 
-    // 2. Configure Git safe directory and user identity
+    // 2. Configure Git safe directory, user identity, and authenticated remote
     try {
       const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
       runGitCommand(['config', '--global', '--add', 'safe.directory', workspace]);
@@ -34764,6 +34764,8 @@ async function run() {
         'user.email',
         'orbitci[bot]@users.noreply.github.com',
       ]);
+      const remoteUrl = `https://x-access-token:${githubToken}@github.com/${githubRepository}.git`;
+      runGitCommand(['remote', 'set-url', 'origin', remoteUrl]);
     } catch (gitConfigErr) {
       core.warning(`Failed to set git config: ${gitConfigErr.message}`);
     }
