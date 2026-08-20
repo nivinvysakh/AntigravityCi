@@ -241,6 +241,14 @@ sequenceDiagram
 
 ---
 
+## ⚖️ Disclaimer
+
+**AntigravityCI** is an independent open-source community project and is not officially affiliated with, endorsed by, sponsored by, or associated with Google LLC, Alphabet Inc., or the Google Gemini project.
+
+*Google*, *Google Gemini*, and related marks, logos, and brands are trademarks or registered trademarks of Google LLC. All other product names, logos, and brands mentioned are property of their respective owners.
+
+---
+
 ## 📄 License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.
