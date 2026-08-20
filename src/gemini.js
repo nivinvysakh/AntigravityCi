@@ -11,17 +11,26 @@ export const GEMINI_RESPONSE_SCHEMA = {
   properties: {
     summary: {
       type: SchemaType.STRING,
-      description: 'A concise 1-2 sentence summary of changes made.',
+      description: 'A concise 1-2 sentence summary of changes or analysis made.',
     },
     explanation: {
       type: SchemaType.STRING,
       description:
-        'Detailed markdown explanation of the improvements made and rationale.',
+        'Detailed markdown explanation of improvements made, architectural tradeoffs, or findings.',
+    },
+    risk_level: {
+      type: SchemaType.STRING,
+      description:
+        "Assessment of change risk: 'LOW', 'MEDIUM', or 'HIGH'.",
+    },
+    breaking_changes: {
+      type: SchemaType.BOOLEAN,
+      description: 'Whether any proposed changes introduce breaking API changes.',
     },
     pr_title: {
       type: SchemaType.STRING,
       description:
-        "Conventional commit style PR title (e.g. 'refactor(api): optimize async request loop')",
+        "Conventional commit style PR title (e.g. 'perf(db): optimize query loop with batching')",
     },
     pr_body: {
       type: SchemaType.STRING,
@@ -29,7 +38,8 @@ export const GEMINI_RESPONSE_SCHEMA = {
     },
     modified_files: {
       type: SchemaType.ARRAY,
-      description: 'List of files to modify, create, or delete.',
+      description:
+        'List of files to modify, create, or delete. Empty for read-only commands like explain.',
       items: {
         type: SchemaType.OBJECT,
         properties: {
@@ -54,6 +64,8 @@ export const GEMINI_RESPONSE_SCHEMA = {
   required: [
     'summary',
     'explanation',
+    'risk_level',
+    'breaking_changes',
     'pr_title',
     'pr_body',
     'modified_files',
@@ -64,7 +76,7 @@ export const GEMINI_RESPONSE_SCHEMA = {
  * Call Google Gemini with automatic multi-model fallback cascade.
  *
  * @param {string} apiKey - Google Gemini API Key
- * @param {string} requestedModel - Primary model to use (e.g. 'gemini-2.5-flash' or 'gemini-1.5-flash')
+ * @param {string} requestedModel - Primary model to use
  * @param {string} prompt - User instruction and context JSON
  * @param {string} systemInstruction - System rules and guidelines
  * @returns {Promise<{ data: any, modelUsed: string }>}
@@ -102,7 +114,6 @@ export async function callGeminiCascade(
       const text = result.response.text();
 
       if (text) {
-        // Strip markdown backticks if present
         const cleanJson = text
           .trim()
           .replace(/^```(?:json)?\s*/i, '')

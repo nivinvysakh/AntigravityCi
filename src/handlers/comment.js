@@ -7,10 +7,41 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as core from '@actions/core';
 import { AUTHORIZED_ROLES } from '../config.js';
+import { loadProjectConfig } from '../configLoader.js';
 import { isSafeTextFile, readFileSafely } from '../filters.js';
 import { callAiEngine } from '../gemini.js';
 import { runGitCommand } from '../github.js';
 import { parseCommentCommand } from '../parser.js';
+
+/**
+ * Render a formatted AI Risk & Quality scorecard markdown table.
+ *
+ * @param {string} riskLevel - 'LOW', 'MEDIUM', or 'HIGH'
+ * @param {boolean} breakingChanges - boolean
+ * @param {number} filesCount - count of modified files
+ * @returns {string} Markdown scorecard block
+ */
+function renderScorecard(riskLevel, breakingChanges, filesCount) {
+  const riskBadge =
+    riskLevel?.toUpperCase() === 'LOW'
+      ? '🟢 **Low**'
+      : riskLevel?.toUpperCase() === 'MEDIUM'
+      ? '🟡 **Medium**'
+      : '🔴 **High**';
+
+  const breakingBadge = breakingChanges
+    ? '⚠️ **Yes (Breaking)**'
+    : '✅ **None (Backward Compatible)**';
+
+  return (
+    '### 📊 AI Quality & Risk Scorecard\n\n' +
+    '| Metric | Assessment |\n' +
+    '|---|---|\n' +
+    `| 🛡️ **Risk Level** | ${riskBadge} |\n` +
+    `| ⚠️ **Breaking Changes** | ${breakingBadge} |\n` +
+    `| 📁 **Files Changed** | \`${filesCount} file(s)\` |\n`
+  );
+}
 
 /**
  * Handle issue_comment event on a Pull Request.
@@ -19,7 +50,7 @@ import { parseCommentCommand } from '../parser.js';
  * @param {any} eventData
  * @param {Object} options
  * @param {string} [options.geminiApiKey]
- * @param {string} [options.modelName='gemini-2.5-flash']
+ * @param {string} [options.modelName='gemini-3.6-flash']
  * @param {string} [options.botName='@antigravityci']
  * @param {boolean} [options.postAck=true]
  * @param {number} [options.maxFileSizeKb=50]
@@ -90,20 +121,15 @@ export async function handleComment(gh, eventData, options) {
     `Triggered by @${commentAuthor} (${authorAssociation}) on PR #${prNumber}: command='${parsed.command}', instruction='${parsed.instruction}'`
   );
 
-  // 4. Acknowledge with thumbs-up reaction and optional replay comment
+  // 4. Acknowledge with thumbs-up reaction and instant replay comment
   await gh.addCommentReaction(commentId, '+1');
 
   if (postAck) {
-    const actionVerb =
-      parsed.command === 'refactor' || parsed.command === 'refactoring'
-        ? 'Refactoring your code'
-        : `Processing \`${parsed.command}\``;
-
     const replayText = `@${botName.replace(/^@/, '')} ${parsed.command} ${parsed.instruction}`.trim();
     const ackMessage =
-      `🤖 **AntigravityCI**: ${actionVerb} for @${commentAuthor}!\n\n` +
+      `🤖 **AntigravityCI**: ${parsed.actionVerb} for @${commentAuthor}!\n\n` +
       `> 💬 **Instruction Replay:** \`${replayText}\`\n\n` +
-      `⏳ Analyzing PR #${prNumber} modified files with Google Gemini (${modelName}). I'll create a branch and open a new PR shortly...`;
+      `⏳ Analyzing PR #${prNumber} modified files with Google Gemini (${modelName}). Generating response...`;
 
     await gh.createIssueComment(prNumber, ackMessage);
   }
@@ -153,7 +179,7 @@ export async function handleComment(gh, eventData, options) {
 
     const safeCheck = isSafeTextFile(filename, 0, maxFileSizeKb);
     if (!safeCheck.safe) {
-      ignoredFilesLog.append?.(filename) || ignoredFilesLog.push(`\`${filename}\` (${safeCheck.reason})`);
+      ignoredFilesLog.push(`\`${filename}\` (${safeCheck.reason})`);
       continue;
     }
 
@@ -181,16 +207,29 @@ export async function handleComment(gh, eventData, options) {
     return 0;
   }
 
-  // 7. Construct prompt for AI Engine
+  // 7. Load custom team rules from .antigravity.json if present
+  const projectConfig = loadProjectConfig();
+  let customRulesText = '';
+  if (projectConfig?.rules?.length) {
+    customRulesText =
+      '\nTeam Coding Standards & Project Rules:\n- ' +
+      projectConfig.rules.join('\n- ') +
+      '\n';
+  }
+
+  // 8. Construct prompt for AI Engine
   const systemInstruction =
-    'You are AntigravityCI, an expert AI software engineer and code reviewer. ' +
-    "Your task is to fulfill the user's PR command by analyzing the provided files, diffs, " +
-    'and instructions, and producing high quality, production-grade updated files.\n' +
+    'You are AntigravityCI, an elite AI software engineer and code reviewer.\n' +
+    `Your task is to fulfill the user's PR command: '${parsed.command}' by analyzing the provided files, diffs, and instructions.\n` +
     'Rules:\n' +
-    '1. Return complete file content for each modified file in `modified_files`.\n' +
-    "2. Do not truncate code with comments like '// rest of code stays same'. Always return full working files.\n" +
-    "3. Follow the repo's existing coding style, naming conventions, and patterns.\n" +
-    '4. Provide a clear, conventional commit PR title and detailed PR body.';
+    "1. For commands that modify code ('refactor', 'fix', 'test', 'doc', 'security', 'perf', 'types'):\n" +
+    '   - Return complete updated file content in `modified_files` for every modified file.\n' +
+    "   - Do NOT truncate code with comments like '// rest of code stays same'. Always return full working files.\n" +
+    "2. For read-only analysis commands ('explain', 'changelog', 'review'):\n" +
+    '   - If no code edits are needed, leave `modified_files` as an empty list [] and provide a comprehensive markdown breakdown in `explanation`.\n' +
+    '3. Evaluate `risk_level` as LOW, MEDIUM, or HIGH, and indicate `breaking_changes` (true/false).\n' +
+    '4. Follow the repo existing coding style and conventions.\n' +
+    customRulesText;
 
   const promptPayload = {
     command: parsed.command,
@@ -206,11 +245,11 @@ export async function handleComment(gh, eventData, options) {
   };
 
   const userPrompt =
-    `User Command: ${parsed.command}\n` +
-    `User Instruction: ${parsed.instruction || 'Apply best practices and appropriate fixes/improvements.'}\n\n` +
+    `Command: ${parsed.command}\n` +
+    `Instruction: ${parsed.instruction || 'Apply best practices and appropriate fixes/improvements.'}\n\n` +
     `Context JSON:\n${JSON.stringify(promptPayload, null, 2)}`;
 
-  // 8. Call AI Engine (Google Gemini with Fallback Cascade)
+  // 9. Call AI Engine (Google Gemini Cascade)
   let aiResponse;
   let engineUsed;
   try {
@@ -232,16 +271,30 @@ export async function handleComment(gh, eventData, options) {
     return 1;
   }
 
-  if (!aiResponse.modified_files || aiResponse.modified_files.length === 0) {
-    await gh.createIssueComment(
-      prNumber,
-      `ℹ️ **AntigravityCI**: Analyzed PR #${prNumber} but determined no file modifications were necessary.\n\n` +
-        `**Explanation:**\n${aiResponse.explanation}`
-    );
+  const hasModifiedFiles =
+    Array.isArray(aiResponse.modified_files) &&
+    aiResponse.modified_files.length > 0;
+
+  // 10. Comment-Only Mode (e.g. '@antigravity explain' or read-only review)
+  if (parsed.isCommentOnly || !hasModifiedFiles) {
+    const analysisComment =
+      `## 💡 AntigravityCI: \`${parsed.command}\` Analysis\n\n` +
+      `> 💬 **Instruction:** \`${parsed.botName} ${parsed.command} ${parsed.instruction}\`.trim()\n\n` +
+      renderScorecard(
+        aiResponse.risk_level || 'LOW',
+        aiResponse.breaking_changes || false,
+        0
+      ) +
+      `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
+      `### 🔍 Detailed Explanation & Findings\n${aiResponse.explanation}\n\n` +
+      `---\n*Generated with 🧠 [${engineUsed}](https://github.com/${gh.repository}) via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
+
+    await gh.createIssueComment(prNumber, analysisComment);
+    core.info('AntigravityCI comment analysis posted successfully!');
     return 0;
   }
 
-  // 9. Create dedicated Git branch and commit changes
+  // 11. Create dedicated Git branch and commit changes
   const shortId = crypto.randomBytes(3).toString('hex');
   const cleanCmd = parsed.command.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
   const newBranchName = `antigravityci/${cleanCmd}-pr${prNumber}-${shortId}`;
@@ -278,13 +331,18 @@ export async function handleComment(gh, eventData, options) {
     runGitCommand(['push', '-u', 'origin', newBranchName]);
     core.info(`Pushed branch ${newBranchName} to origin.`);
 
-    // 10. Open a new Pull Request
+    // 12. Open a new Pull Request with the AI Scorecard
     const repoSlug = gh.repository;
     const formattedBody =
       `## 🤖 AntigravityCI: \`${parsed.command}\`\n\n` +
       `Triggered by @${commentAuthor} on original PR #${prNumber} ([comment](${commentHtmlUrl})):\n` +
       `> \`${parsed.botName} ${parsed.command} ${parsed.instruction}\`\n\n` +
-      `### 📋 Summary\n${aiResponse.summary}\n\n` +
+      renderScorecard(
+        aiResponse.risk_level || 'LOW',
+        aiResponse.breaking_changes || false,
+        changedPaths.length
+      ) +
+      `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
       `### 🔍 Detailed Explanation\n${aiResponse.explanation}\n\n` +
       `### 📁 Modified Files (${changedPaths.length})\n` +
       changedPaths.map((p) => `- \`${p}\``).join('\n') +
@@ -316,11 +374,12 @@ export async function handleComment(gh, eventData, options) {
       await gh.addAssignees(newPrNumber, reviewersList);
     }
 
-    // Post final confirmation comment to original PR thread
+    // Post confirmation comment to original PR thread
     const commentMsg =
       `🚀 **AntigravityCI**: Successfully processed \`${parsed.command}\`!\n\n` +
       `**New Pull Request:** [#${newPrNumber} - ${aiResponse.pr_title}](${newPrUrl})\n\n` +
       `**Summary:** ${aiResponse.summary}\n\n` +
+      `**Risk Assessment:** ${aiResponse.risk_level || 'LOW'}\n\n` +
       `**Modified Files:**\n` +
       changedPaths.map((p) => `- \`${p}\``).join('\n');
 

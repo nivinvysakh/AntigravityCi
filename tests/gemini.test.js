@@ -18,6 +18,8 @@ const { mockData } = vi.hoisted(() => {
     mockData: {
       summary: 'Refactored async loops',
       explanation: 'Replaced for-loops with Promise.all',
+      risk_level: 'LOW',
+      breaking_changes: false,
       pr_title: 'refactor(async): use Promise.all',
       pr_body: 'Optimized async operations',
       modified_files: [

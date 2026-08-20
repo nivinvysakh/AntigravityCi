@@ -7,6 +7,7 @@ describe('Comment Command Parsing', () => {
     expect(result).not.toBeNull();
     expect(result.command).toBe('refactor');
     expect(result.instruction).toBe('');
+    expect(result.isCommentOnly).toBe(false);
   });
 
   it('parses command with natural language instruction', () => {
@@ -18,6 +19,50 @@ describe('Comment Command Parsing', () => {
     expect(result.instruction).toBe(
       'handle edge case when token is expired'
     );
+  });
+
+  it('parses security command and audit alias', () => {
+    const res1 = parseCommentCommand('@antigravity security audit sql injection');
+    expect(res1.command).toBe('security');
+    expect(res1.actionVerb).toContain('Auditing security');
+
+    const res2 = parseCommentCommand('@antigravity audit for secret leaks');
+    expect(res2.command).toBe('security');
+  });
+
+  it('parses perf and optimize commands', () => {
+    const res1 = parseCommentCommand('@antigravity perf optimize db queries');
+    expect(res1.command).toBe('perf');
+    expect(res1.actionVerb).toContain('Optimizing performance');
+
+    const res2 = parseCommentCommand('@antigravity optimize memory usage');
+    expect(res2.command).toBe('perf');
+  });
+
+  it('parses explain command as comment-only mode', () => {
+    const result = parseCommentCommand(
+      '@antigravity explain architectural tradeoffs'
+    );
+    expect(result).not.toBeNull();
+    expect(result.command).toBe('explain');
+    expect(result.isCommentOnly).toBe(true);
+    expect(result.actionVerb).toContain('Explaining code');
+  });
+
+  it('parses types and typecheck commands', () => {
+    const res1 = parseCommentCommand('@antigravity types add typescript types');
+    expect(res1.command).toBe('types');
+
+    const res2 = parseCommentCommand('@antigravity typecheck python type hints');
+    expect(res2.command).toBe('types');
+  });
+
+  it('parses changelog and summarize commands', () => {
+    const res1 = parseCommentCommand('@antigravity changelog generate release notes');
+    expect(res1.command).toBe('changelog');
+
+    const res2 = parseCommentCommand('@antigravity summarize changes for release');
+    expect(res2.command).toBe('changelog');
   });
 
   it('parses multiline instructions correctly', () => {

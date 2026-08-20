@@ -110,31 +110,62 @@ jobs:
 
 ---
 
-## 💡 Example Commands
+## 💡 Commands & Features
 
 Tag AntigravityCI in any Pull Request discussion with any natural instruction:
 
-| Command    | Example Usage                                                    | What AntigravityCI Does                                          |
-| ---------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `refactor` | `@antigravity refactor optimize this async query loop`           | Refactors code for performance, readability, and idiomatic style |
-| `fix`      | `@antigravity fix handle edge case when token is expired`        | Identifies bugs, resolves exceptions, and adds edge-case guards  |
-| `test`     | `@antigravity test add pytest test cases for auth module`        | Generates comprehensive unit and integration test suites         |
-| `doc`      | `@antigravity doc add Google-style docstrings with examples`     | Adds clean type annotations, docstrings, and documentation       |
-| `review`   | `@antigravity review check for memory leaks and race conditions` | Audits modified files and implements hardened solutions          |
+| Command | Example Usage | What AntigravityCI Does |
+|---|---|---|
+| `refactor` | `@antigravity refactor optimize this async query loop` | Refactors code for performance, readability, and idiomatic style |
+| `security` *(or `audit`)* | `@antigravity security audit for OWASP Top 10 vulnerabilities` | Audits modified files for injection, leaks, and security flaws, creating a hardened patch PR |
+| `perf` *(or `optimize`)* | `@antigravity perf eliminate redundant allocations and async lag` | Performance-focused profiling and optimization |
+| `explain` | `@antigravity explain breakdown the architectural tradeoffs` | Posts an ELI5 architectural breakdown directly in the comment thread (comment-only) |
+| `types` | `@antigravity types add strict TypeScript interfaces / type hints` | Adds strict type definitions, annotations, and schemas |
+| `changelog` *(or `summarize`)* | `@antigravity changelog generate user-facing release notes` | Generates Conventional Changelog release notes |
+| `fix` | `@antigravity fix handle edge case when token is expired` | Identifies bugs, resolves exceptions, and adds edge-case guards |
+| `test` | `@antigravity test add pytest / vitest test cases for auth` | Generates comprehensive unit and integration test suites |
+| `doc` | `@antigravity doc add Google-style docstrings with examples` | Adds clean type annotations, docstrings, and documentation |
+| `review` | `@antigravity review check for memory leaks and race conditions` | Audits modified files and implements hardened solutions |
+
+---
+
+## ⚙️ Custom Team Rules (`.antigravity.json`)
+
+You can optionally add a `.antigravity.json` file in your repository root to enforce team conventions:
+
+```json
+{
+  "rules": [
+    "Always use TypeScript strict mode with explicit return types",
+    "Prefer immutable data structures and functional programming patterns",
+    "Use Vitest for unit testing with comprehensive edge cases"
+  ]
+}
+```
+
+---
+
+## 📊 AI Risk & Quality Scorecard
+
+Every generated Pull Request includes an automated risk evaluation:
+
+- 🛡️ **Risk Level**: `🟢 Low` / `🟡 Medium` / `🔴 High`
+- ⚠️ **Breaking Changes**: `✅ None` / `⚠️ Yes`
+- 📁 **Files Changed**: Accurate file modification count
 
 ---
 
 ## ⚙️ Action Inputs
 
-| Input              | Description                                                         | Required |        Default        |
-| ------------------ | ------------------------------------------------------------------- | :------: | :-------------------: |
-| `gemini_api_key`   | Google Gemini API Key from Google AI Studio                         | **Yes**  |           —           |
-| `github_token`     | GitHub Token for API operations (`secrets.GITHUB_TOKEN`)            |    No    | `${{ github.token }}` |
-| `model`            | Gemini model name (`gemini-3.6-flash`, `gemini-3.7-flash`)          |    No    | `"gemini-3.6-flash"`  |
-| `bot_name`         | Comment trigger handle                                              |    No    |  `"@antigravityci"`   |
-| `post_ack`         | Whether to post instruction replay (set `"false"` if Job 1 enabled) |    No    |       `"true"`        |
-| `max_file_size_kb` | Max individual file size in KB sent to LLM context                  |    No    |         `50`          |
-| `target_branch`    | Target branch for generated PR (`auto` uses base of PR)             |    No    |       `"auto"`        |
+| Input | Description | Required | Default |
+|---|---|:---:|:---:|
+| `gemini_api_key` | Google Gemini API Key from Google AI Studio | **Yes** | — |
+| `github_token` | GitHub Token for API operations (`secrets.GITHUB_TOKEN`) | No | `${{ github.token }}` |
+| `model` | Gemini model name (`gemini-3.6-flash`, `gemini-3.7-flash`) | No | `"gemini-3.6-flash"` |
+| `bot_name` | Comment trigger handle | No | `"@antigravityci"` |
+| `post_ack` | Whether to post instruction replay in thread | No | `"true"` |
+| `max_file_size_kb` | Max individual file size in KB sent to LLM context | No | `50` |
+| `target_branch` | Target branch for generated PR (`auto` uses base of PR) | No | `"auto"` |
 
 ---
 
