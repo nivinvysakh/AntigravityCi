@@ -112,20 +112,33 @@ jobs:
 
 ## 💡 Commands & Features
 
-Tag AntigravityCI in any Pull Request discussion with any natural instruction:
+Tag AntigravityCI in any Pull Request discussion with any natural instruction or optional inline flags:
 
 | Command | Example Usage | What AntigravityCI Does |
 |---|---|---|
-| `refactor` | `@antigravity refactor optimize this async query loop` | Refactors code for performance, readability, and idiomatic style |
+| `fix-ci` *(or `fixci`)* | `@antigravity fix-ci` | **Self-healing CI**: Reads failed GitHub Actions logs & opens a patch PR fixing broken tests |
+| `polish-pr` *(or `polish`)* | `@antigravity polish-pr enhance title and summary` | **PR Enhancer**: Rewrites PR title to conventional commits & formats rich structured description |
+| `review` | `@antigravity review check for memory leaks` | **Inline Review**: Posts line-by-line review comments with **one-click GitHub commit suggestions** |
+| `explain` | `@antigravity explain breakdown architectural tradeoffs` | **Architecture Breakdown**: Posts an ELI5 walkthrough with **auto-generated Mermaid diagrams** |
 | `security` *(or `audit`)* | `@antigravity security audit for OWASP Top 10 vulnerabilities` | Audits modified files for injection, leaks, and security flaws, creating a hardened patch PR |
 | `perf` *(or `optimize`)* | `@antigravity perf eliminate redundant allocations and async lag` | Performance-focused profiling and optimization |
-| `explain` | `@antigravity explain breakdown the architectural tradeoffs` | Posts an ELI5 architectural breakdown directly in the comment thread (comment-only) |
 | `types` | `@antigravity types add strict TypeScript interfaces / type hints` | Adds strict type definitions, annotations, and schemas |
 | `changelog` *(or `summarize`)* | `@antigravity changelog generate user-facing release notes` | Generates Conventional Changelog release notes |
+| `refactor` | `@antigravity refactor optimize this async query loop` | Refactors code for performance, readability, and idiomatic style |
 | `fix` | `@antigravity fix handle edge case when token is expired` | Identifies bugs, resolves exceptions, and adds edge-case guards |
 | `test` | `@antigravity test add pytest / vitest test cases for auth` | Generates comprehensive unit and integration test suites |
 | `doc` | `@antigravity doc add Google-style docstrings with examples` | Adds clean type annotations, docstrings, and documentation |
-| `review` | `@antigravity review check for memory leaks and race conditions` | Audits modified files and implements hardened solutions |
+
+### 🎛️ Inline Command Flags
+
+Customize AI behavior directly in your PR comments:
+
+```text
+@antigravity perf optimize db queries --model=gemini-3.7-flash --deep
+```
+
+- `--model=<name>`: Override default Gemini model (e.g. `gemini-3.7-flash`, `gemini-3.6-flash`)
+- `--deep`: Instructs the model to perform deeper multi-step architectural reasoning
 
 ---
 

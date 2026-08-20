@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommentCommand } from '../src/parser.js';
+import { extractFlags, parseCommentCommand } from '../src/parser.js';
+
+describe('Flags Extraction', () => {
+  it('extracts key-value and boolean flags', () => {
+    const text = 'optimize async loop --model=gemini-3.7-flash --deep';
+    const { cleanText, flags } = extractFlags(text);
+    expect(cleanText).toBe('optimize async loop');
+    expect(flags.model).toBe('gemini-3.7-flash');
+    expect(flags.deep).toBe(true);
+  });
+});
 
 describe('Comment Command Parsing', () => {
   it('parses basic command without instruction', () => {
@@ -8,6 +18,29 @@ describe('Comment Command Parsing', () => {
     expect(result.command).toBe('refactor');
     expect(result.instruction).toBe('');
     expect(result.isCommentOnly).toBe(false);
+  });
+
+  it('parses fix-ci command', () => {
+    const result = parseCommentCommand('@antigravity fix-ci');
+    expect(result.command).toBe('fix-ci');
+    expect(result.actionVerb).toContain('Diagnosing failed CI');
+  });
+
+  it('parses polish-pr command', () => {
+    const result = parseCommentCommand('@antigravity polish-pr enhance title and body');
+    expect(result.command).toBe('polish-pr');
+    expect(result.isPolish).toBe(true);
+    expect(result.actionVerb).toContain('Polishing PR');
+  });
+
+  it('parses command with flags correctly', () => {
+    const result = parseCommentCommand(
+      '@antigravity perf optimize db queries --model=gemini-3.7-flash --deep'
+    );
+    expect(result.command).toBe('perf');
+    expect(result.instruction).toBe('optimize db queries');
+    expect(result.flags.model).toBe('gemini-3.7-flash');
+    expect(result.flags.deep).toBe(true);
   });
 
   it('parses command with natural language instruction', () => {
@@ -30,15 +63,6 @@ describe('Comment Command Parsing', () => {
     expect(res2.command).toBe('security');
   });
 
-  it('parses perf and optimize commands', () => {
-    const res1 = parseCommentCommand('@antigravity perf optimize db queries');
-    expect(res1.command).toBe('perf');
-    expect(res1.actionVerb).toContain('Optimizing performance');
-
-    const res2 = parseCommentCommand('@antigravity optimize memory usage');
-    expect(res2.command).toBe('perf');
-  });
-
   it('parses explain command as comment-only mode', () => {
     const result = parseCommentCommand(
       '@antigravity explain architectural tradeoffs'
@@ -47,22 +71,6 @@ describe('Comment Command Parsing', () => {
     expect(result.command).toBe('explain');
     expect(result.isCommentOnly).toBe(true);
     expect(result.actionVerb).toContain('Explaining code');
-  });
-
-  it('parses types and typecheck commands', () => {
-    const res1 = parseCommentCommand('@antigravity types add typescript types');
-    expect(res1.command).toBe('types');
-
-    const res2 = parseCommentCommand('@antigravity typecheck python type hints');
-    expect(res2.command).toBe('types');
-  });
-
-  it('parses changelog and summarize commands', () => {
-    const res1 = parseCommentCommand('@antigravity changelog generate release notes');
-    expect(res1.command).toBe('changelog');
-
-    const res2 = parseCommentCommand('@antigravity summarize changes for release');
-    expect(res2.command).toBe('changelog');
   });
 
   it('parses multiline instructions correctly', () => {

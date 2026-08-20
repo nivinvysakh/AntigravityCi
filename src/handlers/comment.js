@@ -44,6 +44,23 @@ function renderScorecard(riskLevel, breakingChanges, filesCount) {
 }
 
 /**
+ * Render an optional Mermaid diagram if provided.
+ *
+ * @param {string} [diagram]
+ * @returns {string}
+ */
+function renderDiagram(diagram) {
+  if (!diagram || typeof diagram !== 'string' || !diagram.trim()) {
+    return '';
+  }
+  const clean = diagram
+    .trim()
+    .replace(/^```(?:mermaid)?\s*/i, '')
+    .replace(/\s*```$/i, '');
+  return `### 🎨 Architecture & Flow Diagram\n\n\`\`\`mermaid\n${clean}\n\`\`\`\n\n`;
+}
+
+/**
  * Handle issue_comment event on a Pull Request.
  *
  * @param {import('../github.js').GitHubClient} gh
@@ -61,7 +78,7 @@ function renderScorecard(riskLevel, breakingChanges, filesCount) {
 export async function handleComment(gh, eventData, options) {
   const {
     geminiApiKey,
-    modelName = 'gemini-3.6-flash',
+    modelName: defaultModelName = 'gemini-3.6-flash',
     botName = '@antigravityci',
     postAck = true,
     maxFileSizeKb = 50,
@@ -110,15 +127,20 @@ export async function handleComment(gh, eventData, options) {
     return 0;
   }
 
-  // 3. Parse command from comment
+  // 3. Parse command and flags from comment
   const parsed = parseCommentCommand(commentBody, botName);
   if (!parsed) {
     core.info(`Comment does not contain a command for ${botName}. Skipping.`);
     return 0;
   }
 
+  // Allow inline flag override for model (e.g. --model=gemini-3.7-flash)
+  const activeModelName =
+    (typeof parsed.flags.model === 'string' && parsed.flags.model) ||
+    defaultModelName;
+
   core.info(
-    `Triggered by @${commentAuthor} (${authorAssociation}) on PR #${prNumber}: command='${parsed.command}', instruction='${parsed.instruction}'`
+    `Triggered by @${commentAuthor} (${authorAssociation}) on PR #${prNumber}: command='${parsed.command}', instruction='${parsed.instruction}', model='${activeModelName}'`
   );
 
   // 4. Acknowledge with thumbs-up reaction and instant replay comment
@@ -129,7 +151,7 @@ export async function handleComment(gh, eventData, options) {
     const ackMessage =
       `🤖 **AntigravityCI**: ${parsed.actionVerb} for @${commentAuthor}!\n\n` +
       `> 💬 **Instruction Replay:** \`${replayText}\`\n\n` +
-      `⏳ Analyzing PR #${prNumber} modified files with Google Gemini (${modelName}). Generating response...`;
+      `⏳ Analyzing PR #${prNumber} modified files with Google Gemini (${activeModelName}). Generating response...`;
 
     await gh.createIssueComment(prNumber, ackMessage);
   }
@@ -155,6 +177,13 @@ export async function handleComment(gh, eventData, options) {
   const prTitle = prInfo.title || `PR #${prNumber}`;
   const prAuthor = prInfo.user?.login || 'unknown';
   const targetBranch = targetBranchInput === 'auto' ? baseBranch : targetBranchInput;
+
+  // If command is 'fix-ci', fetch failing CI check runs summary
+  let ciLogsSummary = '';
+  if (parsed.command === 'fix-ci') {
+    core.info(`Fetching failing CI check run summaries for commit SHA ${headSha}...`);
+    ciLogsSummary = await gh.getFailedCheckRunsSummary(headSha);
+  }
 
   // Checkout PR branch so workspace has latest files locally
   try {
@@ -222,18 +251,24 @@ export async function handleComment(gh, eventData, options) {
     'You are AntigravityCI, an elite AI software engineer and code reviewer.\n' +
     `Your task is to fulfill the user's PR command: '${parsed.command}' by analyzing the provided files, diffs, and instructions.\n` +
     'Rules:\n' +
-    "1. For commands that modify code ('refactor', 'fix', 'test', 'doc', 'security', 'perf', 'types'):\n" +
+    "1. For commands that modify code ('refactor', 'fix', 'fix-ci', 'test', 'doc', 'security', 'perf', 'types'):\n" +
     '   - Return complete updated file content in `modified_files` for every modified file.\n' +
     "   - Do NOT truncate code with comments like '// rest of code stays same'. Always return full working files.\n" +
-    "2. For read-only analysis commands ('explain', 'changelog', 'review'):\n" +
-    '   - If no code edits are needed, leave `modified_files` as an empty list [] and provide a comprehensive markdown breakdown in `explanation`.\n' +
-    '3. Evaluate `risk_level` as LOW, MEDIUM, or HIGH, and indicate `breaking_changes` (true/false).\n' +
-    '4. Follow the repo existing coding style and conventions.\n' +
+    "2. For read-only analysis commands ('explain', 'changelog'):\n" +
+    '   - Leave `modified_files` as an empty list [] and provide a comprehensive markdown breakdown in `explanation`.\n' +
+    "3. For 'review' command:\n" +
+    '   - Return `inline_comments` with specific lines and GitHub suggestion replacement snippets if applicable.\n' +
+    "4. For 'polish-pr' command:\n" +
+    '   - Return an optimized conventional `pr_title` and comprehensive markdown `pr_body` with summary, test checklist, and overview.\n' +
+    '5. When explaining architecture or complex logic, generate a clean Mermaid sequence/flow diagram in `diagram`.\n' +
+    '6. Evaluate `risk_level` as LOW, MEDIUM, or HIGH, and indicate `breaking_changes` (true/false).\n' +
     customRulesText;
 
   const promptPayload = {
     command: parsed.command,
     instruction: parsed.instruction,
+    flags: parsed.flags,
+    ci_failure_summary: ciLogsSummary || undefined,
     pr_info: {
       number: prNumber,
       title: prTitle,
@@ -255,7 +290,7 @@ export async function handleComment(gh, eventData, options) {
   try {
     const result = await callAiEngine(
       geminiApiKey,
-      modelName,
+      activeModelName,
       userPrompt,
       systemInstruction
     );
@@ -271,20 +306,87 @@ export async function handleComment(gh, eventData, options) {
     return 1;
   }
 
+  // Feature 4: Polish PR Mode (Directly updates PR Title & Description)
+  if (parsed.isPolish) {
+    const polishedTitle = aiResponse.pr_title || prTitle;
+    const polishedBody =
+      `${aiResponse.pr_body || aiResponse.explanation}\n\n` +
+      renderDiagram(aiResponse.diagram) +
+      renderScorecard(
+        aiResponse.risk_level || 'LOW',
+        aiResponse.breaking_changes || false,
+        filesContext.length
+      ) +
+      `\n\n---\n*Polished by [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi) via ${engineUsed}.*`;
+
+    await gh.updatePullRequest(prNumber, {
+      title: polishedTitle,
+      body: polishedBody,
+    });
+
+    await gh.createIssueComment(
+      prNumber,
+      `✨ **AntigravityCI**: Successfully polished PR #${prNumber}!\n\n` +
+        `- **New Title:** \`${polishedTitle}\`\n` +
+        `- **Updated Description:** Enhanced with structured breakdown and risk metrics.`
+    );
+    core.info(`Successfully polished PR #${prNumber}`);
+    return 0;
+  }
+
+  // Feature 2: Inline PR Review Comments Mode
+  if (
+    parsed.command === 'review' &&
+    Array.isArray(aiResponse.inline_comments) &&
+    aiResponse.inline_comments.length > 0
+  ) {
+    const reviewComments = aiResponse.inline_comments.map((item) => {
+      let bodyText = item.comment;
+      if (item.suggestion) {
+        bodyText += `\n\n\`\`\`suggestion\n${item.suggestion}\n\`\`\``;
+      }
+      return {
+        path: item.path,
+        line: item.line,
+        body: bodyText,
+      };
+    });
+
+    const reviewHeader =
+      `## 🔍 AntigravityCI Code Review\n\n` +
+      renderScorecard(
+        aiResponse.risk_level || 'LOW',
+        aiResponse.breaking_changes || false,
+        filesContext.length
+      ) +
+      `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
+      `### 🔍 Detailed Audit\n${aiResponse.explanation}\n\n` +
+      renderDiagram(aiResponse.diagram);
+
+    await gh.createPullRequestReview(prNumber, {
+      body: reviewHeader,
+      comments: reviewComments,
+    });
+
+    core.info(`Posted inline review with ${reviewComments.length} suggestions on PR #${prNumber}`);
+    return 0;
+  }
+
   const hasModifiedFiles =
     Array.isArray(aiResponse.modified_files) &&
     aiResponse.modified_files.length > 0;
 
-  // 10. Comment-Only Mode (e.g. '@antigravity explain' or read-only review)
+  // Feature 3: Comment-Only Mode (e.g. '@antigravity explain' or read-only analysis)
   if (parsed.isCommentOnly || !hasModifiedFiles) {
     const analysisComment =
       `## 💡 AntigravityCI: \`${parsed.command}\` Analysis\n\n` +
-      `> 💬 **Instruction:** \`${parsed.botName} ${parsed.command} ${parsed.instruction}\`.trim()\n\n` +
+      `> 💬 **Instruction:** \`${parsed.botName} ${parsed.command} ${parsed.instruction}\`\n\n` +
       renderScorecard(
         aiResponse.risk_level || 'LOW',
         aiResponse.breaking_changes || false,
         0
       ) +
+      renderDiagram(aiResponse.diagram) +
       `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
       `### 🔍 Detailed Explanation & Findings\n${aiResponse.explanation}\n\n` +
       `---\n*Generated with 🧠 [${engineUsed}](https://github.com/${gh.repository}) via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
@@ -294,7 +396,7 @@ export async function handleComment(gh, eventData, options) {
     return 0;
   }
 
-  // 11. Create dedicated Git branch and commit changes
+  // Feature 1: Code Modifying Commands & Self-Healing Fix-CI PRs
   const shortId = crypto.randomBytes(3).toString('hex');
   const cleanCmd = parsed.command.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
   const newBranchName = `antigravityci/${cleanCmd}-pr${prNumber}-${shortId}`;
@@ -331,7 +433,7 @@ export async function handleComment(gh, eventData, options) {
     runGitCommand(['push', '-u', 'origin', newBranchName]);
     core.info(`Pushed branch ${newBranchName} to origin.`);
 
-    // 12. Open a new Pull Request with the AI Scorecard
+    // Open a new Pull Request with AI Scorecard & Mermaid Diagram
     const repoSlug = gh.repository;
     const formattedBody =
       `## 🤖 AntigravityCI: \`${parsed.command}\`\n\n` +
@@ -342,6 +444,7 @@ export async function handleComment(gh, eventData, options) {
         aiResponse.breaking_changes || false,
         changedPaths.length
       ) +
+      renderDiagram(aiResponse.diagram) +
       `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
       `### 🔍 Detailed Explanation\n${aiResponse.explanation}\n\n` +
       `### 📁 Modified Files (${changedPaths.length})\n` +

@@ -59,6 +59,25 @@ export class GitHubClient {
   }
 
   /**
+   * Update Pull Request title and body (for @antigravity polish-pr).
+   *
+   * @param {number} prNumber
+   * @param {Object} updateData
+   * @param {string} [updateData.title]
+   * @param {string} [updateData.body]
+   * @returns {Promise<any>}
+   */
+  async updatePullRequest(prNumber, updateData) {
+    const { data } = await this.octokit.rest.pulls.update({
+      owner: this.owner,
+      repo: this.repo,
+      pull_number: prNumber,
+      ...updateData,
+    });
+    return data;
+  }
+
+  /**
    * Fetch all modified files in a Pull Request with pagination.
    *
    * @param {number} prNumber
@@ -96,6 +115,69 @@ export class GitHubClient {
       core.warning(`Failed to fetch content for ${path} at ${ref}: ${err.message}`);
     }
     return null;
+  }
+
+  /**
+   * Fetch latest failing check runs or workflow error summaries for a git ref (for @antigravity fix-ci).
+   *
+   * @param {string} ref - Commit SHA or branch ref
+   * @returns {Promise<string>} Error summaries
+   */
+  async getFailedCheckRunsSummary(ref) {
+    try {
+      const { data } = await this.octokit.rest.checks.listForRef({
+        owner: this.owner,
+        repo: this.repo,
+        ref,
+      });
+
+      const failedRuns = (data.check_runs || []).filter(
+        (c) => c.conclusion === 'failure' || c.conclusion === 'timed_out'
+      );
+
+      if (failedRuns.length === 0) {
+        return 'No explicitly failed check runs reported via Checks API.';
+      }
+
+      const summaries = failedRuns.map((r) => {
+        const title = r.name || 'Check';
+        const text = r.output?.text || r.output?.summary || r.output?.title || 'Execution failed';
+        return `### ❌ Check: ${title}\n${text}`;
+      });
+
+      return summaries.join('\n\n');
+    } catch (err) {
+      core.warning(`Could not fetch check runs for ref ${ref}: ${err.message}`);
+      return `Check runs unavailable: ${err.message}`;
+    }
+  }
+
+  /**
+   * Post line-by-line review comments with one-click code suggestions.
+   *
+   * @param {number} prNumber
+   * @param {Object} options
+   * @param {string} options.body
+   * @param {string} [options.event='COMMENT'] - 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
+   * @param {Array<{ path: string, line: number, body: string }>} options.comments
+   * @returns {Promise<any>}
+   */
+  async createPullRequestReview(prNumber, { body, event = 'COMMENT', comments = [] }) {
+    try {
+      const { data } = await this.octokit.rest.pulls.createReview({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+        body,
+        event,
+        comments,
+      });
+      core.info(`Posted PR review with ${comments.length} inline suggestion(s) on #${prNumber}`);
+      return data;
+    } catch (err) {
+      core.warning(`Failed to post inline PR review: ${err.message}. Falling back to standard issue comment.`);
+      return await this.createIssueComment(prNumber, `${body}\n\n**Suggestions:**\n` + comments.map((c) => `- **${c.path}:${c.line}**\n${c.body}`).join('\n\n'));
+    }
   }
 
   /**

@@ -31782,6 +31782,25 @@ class GitHubClient {
   }
 
   /**
+   * Update Pull Request title and body (for @antigravity polish-pr).
+   *
+   * @param {number} prNumber
+   * @param {Object} updateData
+   * @param {string} [updateData.title]
+   * @param {string} [updateData.body]
+   * @returns {Promise<any>}
+   */
+  async updatePullRequest(prNumber, updateData) {
+    const { data } = await this.octokit.rest.pulls.update({
+      owner: this.owner,
+      repo: this.repo,
+      pull_number: prNumber,
+      ...updateData,
+    });
+    return data;
+  }
+
+  /**
    * Fetch all modified files in a Pull Request with pagination.
    *
    * @param {number} prNumber
@@ -31819,6 +31838,69 @@ class GitHubClient {
       core.warning(`Failed to fetch content for ${path} at ${ref}: ${err.message}`);
     }
     return null;
+  }
+
+  /**
+   * Fetch latest failing check runs or workflow error summaries for a git ref (for @antigravity fix-ci).
+   *
+   * @param {string} ref - Commit SHA or branch ref
+   * @returns {Promise<string>} Error summaries
+   */
+  async getFailedCheckRunsSummary(ref) {
+    try {
+      const { data } = await this.octokit.rest.checks.listForRef({
+        owner: this.owner,
+        repo: this.repo,
+        ref,
+      });
+
+      const failedRuns = (data.check_runs || []).filter(
+        (c) => c.conclusion === 'failure' || c.conclusion === 'timed_out'
+      );
+
+      if (failedRuns.length === 0) {
+        return 'No explicitly failed check runs reported via Checks API.';
+      }
+
+      const summaries = failedRuns.map((r) => {
+        const title = r.name || 'Check';
+        const text = r.output?.text || r.output?.summary || r.output?.title || 'Execution failed';
+        return `### ❌ Check: ${title}\n${text}`;
+      });
+
+      return summaries.join('\n\n');
+    } catch (err) {
+      core.warning(`Could not fetch check runs for ref ${ref}: ${err.message}`);
+      return `Check runs unavailable: ${err.message}`;
+    }
+  }
+
+  /**
+   * Post line-by-line review comments with one-click code suggestions.
+   *
+   * @param {number} prNumber
+   * @param {Object} options
+   * @param {string} options.body
+   * @param {string} [options.event='COMMENT'] - 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
+   * @param {Array<{ path: string, line: number, body: string }>} options.comments
+   * @returns {Promise<any>}
+   */
+  async createPullRequestReview(prNumber, { body, event = 'COMMENT', comments = [] }) {
+    try {
+      const { data } = await this.octokit.rest.pulls.createReview({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+        body,
+        event,
+        comments,
+      });
+      core.info(`Posted PR review with ${comments.length} inline suggestion(s) on #${prNumber}`);
+      return data;
+    } catch (err) {
+      core.warning(`Failed to post inline PR review: ${err.message}. Falling back to standard issue comment.`);
+      return await this.createIssueComment(prNumber, `${body}\n\n**Suggestions:**\n` + comments.map((c) => `- **${c.path}:${c.line}**\n${c.body}`).join('\n\n'));
+    }
   }
 
   /**
@@ -33711,6 +33793,11 @@ const GEMINI_RESPONSE_SCHEMA = {
       type: SchemaType.BOOLEAN,
       description: 'Whether any proposed changes introduce breaking API changes.',
     },
+    diagram: {
+      type: SchemaType.STRING,
+      description:
+        "Optional Mermaid markdown code (e.g. 'sequenceDiagram\\n...' or 'flowchart TD\\n...') illustrating data flow or architecture. Return empty string if not applicable.",
+    },
     pr_title: {
       type: SchemaType.STRING,
       description:
@@ -33718,12 +33805,34 @@ const GEMINI_RESPONSE_SCHEMA = {
     },
     pr_body: {
       type: SchemaType.STRING,
-      description: 'Complete markdown description for the new Pull Request.',
+      description: 'Complete markdown description for the Pull Request.',
+    },
+    inline_comments: {
+      type: SchemaType.ARRAY,
+      description:
+        'Optional line-by-line code review comments with suggested diff blocks for PR review mode.',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          path: { type: SchemaType.STRING, description: 'Relative file path' },
+          line: { type: SchemaType.INTEGER, description: 'Line number in the file' },
+          suggestion: {
+            type: SchemaType.STRING,
+            description:
+              'Replacement code snippet for GitHub suggestion block. Empty if purely commentary.',
+          },
+          comment: {
+            type: SchemaType.STRING,
+            description: 'Markdown explanation for the specific line',
+          },
+        },
+        required: ['path', 'line', 'comment'],
+      },
     },
     modified_files: {
       type: SchemaType.ARRAY,
       description:
-        'List of files to modify, create, or delete. Empty for read-only commands like explain.',
+        'List of files to modify, create, or delete. Empty for read-only commands like explain or review.',
       items: {
         type: SchemaType.OBJECT,
         properties: {
@@ -33849,16 +33958,18 @@ async function callAiEngine(
 
 ;// CONCATENATED MODULE: ./src/parser.js
 /**
- * AntigravityCI - PR Comment Command Parser
+ * AntigravityCI - PR Comment Command & Flags Parser
  */
 
 /**
  * @typedef {Object} ParsedCommand
  * @property {string} botName - Normalized bot handle found (e.g. '@antigravity' or '@antigravityci')
  * @property {string} rawCommand - Raw command word as typed by user
- * @property {string} command - Normalized canonical command (e.g. 'refactor', 'security', 'explain')
- * @property {string} instruction - Natural language instruction or prompt
+ * @property {string} command - Normalized canonical command (e.g. 'refactor', 'security', 'fix-ci')
+ * @property {string} instruction - Clean natural language instruction (flags stripped)
+ * @property {Record<string, string|boolean>} flags - Extracted inline CLI-style flags (e.g. { model: 'gemini-3.7-flash', deep: true })
  * @property {boolean} isCommentOnly - Whether this command posts analysis directly without opening a PR
+ * @property {boolean} isPolish - Whether this command directly updates the existing PR description/title
  * @property {string} actionVerb - Dynamic action description for acknowledgment
  */
 
@@ -33875,6 +33986,18 @@ const COMMAND_ALIASES = {
   hotfix: 'fix',
   patch: 'fix',
 
+  // Self-Healing CI & Build Repair
+  'fix-ci': 'fix-ci',
+  fixci: 'fix-ci',
+  'ci-fix': 'fix-ci',
+  'build-fix': 'fix-ci',
+
+  // PR Title & Description Polish
+  'polish-pr': 'polish-pr',
+  polish: 'polish-pr',
+  title: 'polish-pr',
+  describe: 'polish-pr',
+
   // Testing & Test Suites
   test: 'test',
   tests: 'test',
@@ -33887,7 +34010,7 @@ const COMMAND_ALIASES = {
   document: 'doc',
   docstrings: 'doc',
 
-  // Code Review & Auditing
+  // Code Review & Inline Suggestions
   review: 'review',
 
   // Security Audit & Hardening
@@ -33923,9 +34046,11 @@ const COMMAND_ALIASES = {
 const ACTION_VERBS = {
   refactor: 'Refactoring your code ♻️',
   fix: 'Fixing bugs & resolving issues 🐛',
+  'fix-ci': 'Diagnosing failed CI logs & generating fix 🩹',
+  'polish-pr': 'Polishing PR title & description 📝',
   test: 'Generating comprehensive test suites 🧪',
   doc: 'Writing documentation & docstrings 📝',
-  review: 'Auditing code quality & patterns 🔍',
+  review: 'Auditing code quality & generating suggestions 🔍',
   security: 'Auditing security & hardening code 🛡️',
   perf: 'Optimizing performance & throughput ⚡',
   explain: 'Explaining code & architecture 💡',
@@ -33934,7 +34059,30 @@ const ACTION_VERBS = {
 };
 
 /**
- * Parse an issue / PR comment body to extract bot commands and instructions.
+ * Extract inline CLI flags (e.g. --model=gemini-3.7-flash --deep) from instruction string.
+ *
+ * @param {string} text
+ * @returns {{ cleanText: string, flags: Record<string, string|boolean> }}
+ */
+function extractFlags(text) {
+  const flags = {};
+  if (!text) return { cleanText: '', flags };
+
+  const flagRegex = /--([a-zA-Z0-9_-]+)(?:=([^\s]+))?/g;
+  let match;
+
+  while ((match = flagRegex.exec(text)) !== null) {
+    const key = match[1].toLowerCase();
+    const value = match[2] !== undefined ? match[2] : true;
+    flags[key] = value;
+  }
+
+  const cleanText = text.replace(flagRegex, '').trim().replace(/\s+/g, ' ');
+  return { cleanText, flags };
+}
+
+/**
+ * Parse an issue / PR comment body to extract bot commands, instructions, and flags.
  *
  * @param {string} body - The raw comment body
  * @param {string} [botName='@antigravityci'] - The default or configured bot name
@@ -33977,8 +34125,13 @@ function parseCommentCommand(body, botName = '@antigravityci') {
   const foundHandle = matchedBot ? matchedBot[0] : botName;
   const rawCommand = match[1].toLowerCase();
   const normalizedCommand = COMMAND_ALIASES[rawCommand] || rawCommand;
-  const instruction = (match[2] || '').trim();
+  const rawInstruction = (match[2] || '').trim();
+
+  // Extract inline flags
+  const { cleanText: instruction, flags } = extractFlags(rawInstruction);
+
   const isCommentOnly = normalizedCommand === 'explain';
+  const isPolish = normalizedCommand === 'polish-pr';
   const actionVerb = ACTION_VERBS[normalizedCommand] || `Processing \`${rawCommand}\` 🤖`;
 
   return {
@@ -33986,7 +34139,9 @@ function parseCommentCommand(body, botName = '@antigravityci') {
     rawCommand,
     command: normalizedCommand,
     instruction,
+    flags,
     isCommentOnly,
+    isPolish,
     actionVerb,
   };
 }
@@ -34038,6 +34193,23 @@ function renderScorecard(riskLevel, breakingChanges, filesCount) {
 }
 
 /**
+ * Render an optional Mermaid diagram if provided.
+ *
+ * @param {string} [diagram]
+ * @returns {string}
+ */
+function renderDiagram(diagram) {
+  if (!diagram || typeof diagram !== 'string' || !diagram.trim()) {
+    return '';
+  }
+  const clean = diagram
+    .trim()
+    .replace(/^```(?:mermaid)?\s*/i, '')
+    .replace(/\s*```$/i, '');
+  return `### 🎨 Architecture & Flow Diagram\n\n\`\`\`mermaid\n${clean}\n\`\`\`\n\n`;
+}
+
+/**
  * Handle issue_comment event on a Pull Request.
  *
  * @param {import('../github.js').GitHubClient} gh
@@ -34055,7 +34227,7 @@ function renderScorecard(riskLevel, breakingChanges, filesCount) {
 async function handleComment(gh, eventData, options) {
   const {
     geminiApiKey,
-    modelName = 'gemini-3.6-flash',
+    modelName: defaultModelName = 'gemini-3.6-flash',
     botName = '@antigravityci',
     postAck = true,
     maxFileSizeKb = 50,
@@ -34104,15 +34276,20 @@ async function handleComment(gh, eventData, options) {
     return 0;
   }
 
-  // 3. Parse command from comment
+  // 3. Parse command and flags from comment
   const parsed = parseCommentCommand(commentBody, botName);
   if (!parsed) {
     core.info(`Comment does not contain a command for ${botName}. Skipping.`);
     return 0;
   }
 
+  // Allow inline flag override for model (e.g. --model=gemini-3.7-flash)
+  const activeModelName =
+    (typeof parsed.flags.model === 'string' && parsed.flags.model) ||
+    defaultModelName;
+
   core.info(
-    `Triggered by @${commentAuthor} (${authorAssociation}) on PR #${prNumber}: command='${parsed.command}', instruction='${parsed.instruction}'`
+    `Triggered by @${commentAuthor} (${authorAssociation}) on PR #${prNumber}: command='${parsed.command}', instruction='${parsed.instruction}', model='${activeModelName}'`
   );
 
   // 4. Acknowledge with thumbs-up reaction and instant replay comment
@@ -34123,7 +34300,7 @@ async function handleComment(gh, eventData, options) {
     const ackMessage =
       `🤖 **AntigravityCI**: ${parsed.actionVerb} for @${commentAuthor}!\n\n` +
       `> 💬 **Instruction Replay:** \`${replayText}\`\n\n` +
-      `⏳ Analyzing PR #${prNumber} modified files with Google Gemini (${modelName}). Generating response...`;
+      `⏳ Analyzing PR #${prNumber} modified files with Google Gemini (${activeModelName}). Generating response...`;
 
     await gh.createIssueComment(prNumber, ackMessage);
   }
@@ -34149,6 +34326,13 @@ async function handleComment(gh, eventData, options) {
   const prTitle = prInfo.title || `PR #${prNumber}`;
   const prAuthor = prInfo.user?.login || 'unknown';
   const targetBranch = targetBranchInput === 'auto' ? baseBranch : targetBranchInput;
+
+  // If command is 'fix-ci', fetch failing CI check runs summary
+  let ciLogsSummary = '';
+  if (parsed.command === 'fix-ci') {
+    core.info(`Fetching failing CI check run summaries for commit SHA ${headSha}...`);
+    ciLogsSummary = await gh.getFailedCheckRunsSummary(headSha);
+  }
 
   // Checkout PR branch so workspace has latest files locally
   try {
@@ -34216,18 +34400,24 @@ async function handleComment(gh, eventData, options) {
     'You are AntigravityCI, an elite AI software engineer and code reviewer.\n' +
     `Your task is to fulfill the user's PR command: '${parsed.command}' by analyzing the provided files, diffs, and instructions.\n` +
     'Rules:\n' +
-    "1. For commands that modify code ('refactor', 'fix', 'test', 'doc', 'security', 'perf', 'types'):\n" +
+    "1. For commands that modify code ('refactor', 'fix', 'fix-ci', 'test', 'doc', 'security', 'perf', 'types'):\n" +
     '   - Return complete updated file content in `modified_files` for every modified file.\n' +
     "   - Do NOT truncate code with comments like '// rest of code stays same'. Always return full working files.\n" +
-    "2. For read-only analysis commands ('explain', 'changelog', 'review'):\n" +
-    '   - If no code edits are needed, leave `modified_files` as an empty list [] and provide a comprehensive markdown breakdown in `explanation`.\n' +
-    '3. Evaluate `risk_level` as LOW, MEDIUM, or HIGH, and indicate `breaking_changes` (true/false).\n' +
-    '4. Follow the repo existing coding style and conventions.\n' +
+    "2. For read-only analysis commands ('explain', 'changelog'):\n" +
+    '   - Leave `modified_files` as an empty list [] and provide a comprehensive markdown breakdown in `explanation`.\n' +
+    "3. For 'review' command:\n" +
+    '   - Return `inline_comments` with specific lines and GitHub suggestion replacement snippets if applicable.\n' +
+    "4. For 'polish-pr' command:\n" +
+    '   - Return an optimized conventional `pr_title` and comprehensive markdown `pr_body` with summary, test checklist, and overview.\n' +
+    '5. When explaining architecture or complex logic, generate a clean Mermaid sequence/flow diagram in `diagram`.\n' +
+    '6. Evaluate `risk_level` as LOW, MEDIUM, or HIGH, and indicate `breaking_changes` (true/false).\n' +
     customRulesText;
 
   const promptPayload = {
     command: parsed.command,
     instruction: parsed.instruction,
+    flags: parsed.flags,
+    ci_failure_summary: ciLogsSummary || undefined,
     pr_info: {
       number: prNumber,
       title: prTitle,
@@ -34249,7 +34439,7 @@ async function handleComment(gh, eventData, options) {
   try {
     const result = await callAiEngine(
       geminiApiKey,
-      modelName,
+      activeModelName,
       userPrompt,
       systemInstruction
     );
@@ -34265,20 +34455,87 @@ async function handleComment(gh, eventData, options) {
     return 1;
   }
 
+  // Feature 4: Polish PR Mode (Directly updates PR Title & Description)
+  if (parsed.isPolish) {
+    const polishedTitle = aiResponse.pr_title || prTitle;
+    const polishedBody =
+      `${aiResponse.pr_body || aiResponse.explanation}\n\n` +
+      renderDiagram(aiResponse.diagram) +
+      renderScorecard(
+        aiResponse.risk_level || 'LOW',
+        aiResponse.breaking_changes || false,
+        filesContext.length
+      ) +
+      `\n\n---\n*Polished by [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi) via ${engineUsed}.*`;
+
+    await gh.updatePullRequest(prNumber, {
+      title: polishedTitle,
+      body: polishedBody,
+    });
+
+    await gh.createIssueComment(
+      prNumber,
+      `✨ **AntigravityCI**: Successfully polished PR #${prNumber}!\n\n` +
+        `- **New Title:** \`${polishedTitle}\`\n` +
+        `- **Updated Description:** Enhanced with structured breakdown and risk metrics.`
+    );
+    core.info(`Successfully polished PR #${prNumber}`);
+    return 0;
+  }
+
+  // Feature 2: Inline PR Review Comments Mode
+  if (
+    parsed.command === 'review' &&
+    Array.isArray(aiResponse.inline_comments) &&
+    aiResponse.inline_comments.length > 0
+  ) {
+    const reviewComments = aiResponse.inline_comments.map((item) => {
+      let bodyText = item.comment;
+      if (item.suggestion) {
+        bodyText += `\n\n\`\`\`suggestion\n${item.suggestion}\n\`\`\``;
+      }
+      return {
+        path: item.path,
+        line: item.line,
+        body: bodyText,
+      };
+    });
+
+    const reviewHeader =
+      `## 🔍 AntigravityCI Code Review\n\n` +
+      renderScorecard(
+        aiResponse.risk_level || 'LOW',
+        aiResponse.breaking_changes || false,
+        filesContext.length
+      ) +
+      `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
+      `### 🔍 Detailed Audit\n${aiResponse.explanation}\n\n` +
+      renderDiagram(aiResponse.diagram);
+
+    await gh.createPullRequestReview(prNumber, {
+      body: reviewHeader,
+      comments: reviewComments,
+    });
+
+    core.info(`Posted inline review with ${reviewComments.length} suggestions on PR #${prNumber}`);
+    return 0;
+  }
+
   const hasModifiedFiles =
     Array.isArray(aiResponse.modified_files) &&
     aiResponse.modified_files.length > 0;
 
-  // 10. Comment-Only Mode (e.g. '@antigravity explain' or read-only review)
+  // Feature 3: Comment-Only Mode (e.g. '@antigravity explain' or read-only analysis)
   if (parsed.isCommentOnly || !hasModifiedFiles) {
     const analysisComment =
       `## 💡 AntigravityCI: \`${parsed.command}\` Analysis\n\n` +
-      `> 💬 **Instruction:** \`${parsed.botName} ${parsed.command} ${parsed.instruction}\`.trim()\n\n` +
+      `> 💬 **Instruction:** \`${parsed.botName} ${parsed.command} ${parsed.instruction}\`\n\n` +
       renderScorecard(
         aiResponse.risk_level || 'LOW',
         aiResponse.breaking_changes || false,
         0
       ) +
+      renderDiagram(aiResponse.diagram) +
       `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
       `### 🔍 Detailed Explanation & Findings\n${aiResponse.explanation}\n\n` +
       `---\n*Generated with 🧠 [${engineUsed}](https://github.com/${gh.repository}) via [AntigravityCI](https://github.com/nivinvysakh/AntigravityCi).*`;
@@ -34288,7 +34545,7 @@ async function handleComment(gh, eventData, options) {
     return 0;
   }
 
-  // 11. Create dedicated Git branch and commit changes
+  // Feature 1: Code Modifying Commands & Self-Healing Fix-CI PRs
   const shortId = external_node_crypto_.randomBytes(3).toString('hex');
   const cleanCmd = parsed.command.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
   const newBranchName = `antigravityci/${cleanCmd}-pr${prNumber}-${shortId}`;
@@ -34325,7 +34582,7 @@ async function handleComment(gh, eventData, options) {
     runGitCommand(['push', '-u', 'origin', newBranchName]);
     core.info(`Pushed branch ${newBranchName} to origin.`);
 
-    // 12. Open a new Pull Request with the AI Scorecard
+    // Open a new Pull Request with AI Scorecard & Mermaid Diagram
     const repoSlug = gh.repository;
     const formattedBody =
       `## 🤖 AntigravityCI: \`${parsed.command}\`\n\n` +
@@ -34336,6 +34593,7 @@ async function handleComment(gh, eventData, options) {
         aiResponse.breaking_changes || false,
         changedPaths.length
       ) +
+      renderDiagram(aiResponse.diagram) +
       `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
       `### 🔍 Detailed Explanation\n${aiResponse.explanation}\n\n` +
       `### 📁 Modified Files (${changedPaths.length})\n` +

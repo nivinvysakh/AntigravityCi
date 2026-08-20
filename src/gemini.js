@@ -27,6 +27,11 @@ export const GEMINI_RESPONSE_SCHEMA = {
       type: SchemaType.BOOLEAN,
       description: 'Whether any proposed changes introduce breaking API changes.',
     },
+    diagram: {
+      type: SchemaType.STRING,
+      description:
+        "Optional Mermaid markdown code (e.g. 'sequenceDiagram\\n...' or 'flowchart TD\\n...') illustrating data flow or architecture. Return empty string if not applicable.",
+    },
     pr_title: {
       type: SchemaType.STRING,
       description:
@@ -34,12 +39,34 @@ export const GEMINI_RESPONSE_SCHEMA = {
     },
     pr_body: {
       type: SchemaType.STRING,
-      description: 'Complete markdown description for the new Pull Request.',
+      description: 'Complete markdown description for the Pull Request.',
+    },
+    inline_comments: {
+      type: SchemaType.ARRAY,
+      description:
+        'Optional line-by-line code review comments with suggested diff blocks for PR review mode.',
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          path: { type: SchemaType.STRING, description: 'Relative file path' },
+          line: { type: SchemaType.INTEGER, description: 'Line number in the file' },
+          suggestion: {
+            type: SchemaType.STRING,
+            description:
+              'Replacement code snippet for GitHub suggestion block. Empty if purely commentary.',
+          },
+          comment: {
+            type: SchemaType.STRING,
+            description: 'Markdown explanation for the specific line',
+          },
+        },
+        required: ['path', 'line', 'comment'],
+      },
     },
     modified_files: {
       type: SchemaType.ARRAY,
       description:
-        'List of files to modify, create, or delete. Empty for read-only commands like explain.',
+        'List of files to modify, create, or delete. Empty for read-only commands like explain or review.',
       items: {
         type: SchemaType.OBJECT,
         properties: {
