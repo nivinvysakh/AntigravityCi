@@ -103,7 +103,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run OrbitCI
-        uses: nivinvysakh/AntigravityCi@main
+        uses: nivinvysakh/OrbitCi@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -223,8 +223,8 @@ sequenceDiagram
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/nivinvysakh/AntigravityCi.git
-   cd AntigravityCi
+   git clone https://github.com/nivinvysakh/OrbitCi.git
+   cd OrbitCi
    ```
 
 2. Install dependencies:

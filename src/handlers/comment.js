@@ -323,7 +323,7 @@ export async function handleComment(gh, eventData, options) {
         aiResponse.breaking_changes || false,
         filesContext.length
       ) +
-      `\n\n---\n*Polished by [OrbitCI](https://github.com/${gh.repository}) via \`${engineUsed}\`.*`;
+      `\n\n---\n*Polished by [OrbitCI](https://github.com/nivinvysakh/OrbitCi) via \`${engineUsed}\`.*`;
 
     await gh.updatePullRequest(prNumber, {
       title: polishedTitle,
@@ -395,7 +395,7 @@ export async function handleComment(gh, eventData, options) {
       renderDiagram(aiResponse.diagram) +
       `\n### 📋 Summary\n${aiResponse.summary}\n\n` +
       `### 🔍 Detailed Explanation & Findings\n${aiResponse.explanation}\n\n` +
-      `---\n*Generated with 🧠 \`${engineUsed}\` via [OrbitCI](https://github.com/${gh.repository}).*`;
+      `---\n*Generated with 🧠 \`${engineUsed}\` via [OrbitCI](https://github.com/nivinvysakh/OrbitCi).*`;
 
     await gh.createIssueComment(prNumber, analysisComment);
     core.info('OrbitCI comment analysis posted successfully!');
@@ -454,7 +454,7 @@ export async function handleComment(gh, eventData, options) {
       `### 🔍 Detailed Explanation\n${aiResponse.explanation}\n\n` +
       `### 📁 Modified Files (${changedPaths.length})\n` +
       changedPaths.map((p) => `- \`${p}\``).join('\n') +
-      `\n\n---\n*Generated with 🧠 \`${engineUsed}\` via [OrbitCI](https://github.com/${gh.repository}).*`;
+      `\n\n---\n*Generated with 🧠 \`${engineUsed}\` via [OrbitCI](https://github.com/nivinvysakh/OrbitCi).*`;
 
     const newPr = await gh.createPullRequest({
       title: aiResponse.pr_title || `[orbitci] ${parsed.command} on PR #${prNumber}`,
