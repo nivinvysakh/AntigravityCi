@@ -1,6 +1,6 @@
 name: "AntigravityCI"
 description: "Autonomous AI PR Assistant powered by Google Gemini ♊."
-author: "Antigravity Team"
+author: "NivinVysakh"
 branding:
   icon: "cpu"
   color: "purple"
@@ -35,13 +35,5 @@ inputs:
     default: "auto"
 
 runs:
-  using: "docker"
-  image: "Dockerfile"
-  env:
-    GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
-    GITHUB_TOKEN: ${{ inputs.github_token }}
-    INPUT_MODEL: ${{ inputs.model }}
-    INPUT_BOT_NAME: ${{ inputs.bot_name }}
-    INPUT_POST_ACK: ${{ inputs.post_ack }}
-    INPUT_MAX_FILE_SIZE_KB: ${{ inputs.max_file_size_kb }}
-    INPUT_TARGET_BRANCH: ${{ inputs.target_branch }}
+  using: "node20"
+  main: "dist/index.js"

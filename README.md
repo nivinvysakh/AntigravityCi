@@ -234,19 +234,17 @@ sequenceDiagram
    cd AntigravityCi
    ```
 
-2. Set up virtual environment:
+2. Install dependencies:
 
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   pip install pytest pytest-mock ruff
+   npm install
    ```
 
-3. Run automated tests and linters:
+3. Run automated tests and build:
+
    ```bash
-   pytest -v
-   ruff check .
+   npm test
+   npm run build
    ```
 
 ---

@@ -11,24 +11,13 @@ updates:
     commit-message:
       prefix: "ci(deps)"
 
-  # Maintain Python dependencies
-  - package-ecosystem: "pip"
+  # Maintain npm / Node.js dependencies
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
     labels:
       - "dependencies"
-      - "python"
+      - "javascript"
     commit-message:
       prefix: "chore(deps)"
-
-  # Maintain Docker base image
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    labels:
-      - "dependencies"
-      - "docker"
-    commit-message:
-      prefix: "docker(deps)"

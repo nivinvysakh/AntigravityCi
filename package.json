@@ -1,0 +1,32 @@
+{
+  "name": "antigravityci",
+  "version": "2.0.0",
+  "description": "Autonomous AI Pull Request Assistant powered by Google Gemini ♊",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "ncc build src/index.js -o dist --source-map --license licenses.txt",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ tests/"
+  },
+  "keywords": [
+    "github-action",
+    "ai",
+    "gemini",
+    "code-review",
+    "pull-request",
+    "refactoring"
+  ],
+  "author": "Nivin Vysakh",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0",
+    "@google/generative-ai": "^0.24.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3",
+    "vitest": "^3.0.7"
+  }
+}

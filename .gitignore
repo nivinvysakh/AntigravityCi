@@ -9,7 +9,6 @@ venv/
 .venv/
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -38,3 +37,5 @@ htmlcov/
 .env
 *.env
 *.log
+
+node_modules
