@@ -2,34 +2,29 @@ name: CI Test Suite
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/rewrite-js, beta, test]
   pull_request:
-    branches: [main]
+    branches: [main, feature/rewrite-js, beta, test]
 
 jobs:
   test:
-    name: Run Unit Tests & Lint
+    name: Run Unit Tests & Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.11"
-          cache: "pip"
+          node-version: "20"
+          cache: "npm"
 
       - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-mock ruff
+        run: npm ci
 
-      - name: Lint Code with Ruff
-        run: |
-          ruff check .
+      - name: Run Vitest Suite
+        run: npm test
 
-      - name: Run Pytest Suite
-        run: |
-          pytest tests/ -v --tb=short
+      - name: Verify Distribution Build
+        run: npm run build

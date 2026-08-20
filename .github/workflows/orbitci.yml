@@ -1,0 +1,27 @@
+# Make Sure to set the GEMINI_API_KEY secret in your repository settings for this workflow to function correctly.
+name: OrbitCI
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  orbit:
+    name: OrbitCI PR Assistant
+    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && (contains(github.event.comment.body, 'orbit') || contains(github.event.comment.body, 'Orbit') || contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run OrbitCI
+        uses: nivinvysakh/OrbitCi@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
