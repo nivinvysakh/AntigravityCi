@@ -87,52 +87,8 @@ on:
     types: [created]
 
 jobs:
-  acknowledge:
-    name: Instant Acknowledgment
-    if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      pull-requests: write
-    steps:
-      - name: Fast React & Reply
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { comment, issue } = context.payload;
-            if (!comment || !issue) return;
-
-            const allowedRoles = ['OWNER', 'MEMBER', 'COLLABORATOR'];
-            if (!allowedRoles.includes(comment.author_association)) return;
-
-            const match = comment.body.trim().match(/@antigravity(?:ci)?\s+([a-zA-Z0-9_-]+)(?:\s+([\s\S]+))?/i);
-            if (!match) return;
-
-            const [, cmd, rawInstruction] = match;
-            const instruction = (rawInstruction || '').trim();
-            const author = comment.user.login;
-
-            await github.rest.reactions.createForIssueComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: comment.id,
-              content: '+1'
-            }).catch(() => {});
-
-            const actionVerb = cmd.toLowerCase().startsWith('refactor') ? 'Refactoring your code' : `Processing \`${cmd}\``;
-            const replay = `@antigravityci ${cmd} ${instruction}`.trim();
-            const message = `🤖 **AntigravityCI**: ${actionVerb} for @${author}!\n\n> 💬 **Instruction Replay:** \`${replay}\`\n\n⏳ Spawning AI engine and analyzing PR #${issue.number} modified files. I'll open a new PR shortly...`;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              body: message
-            }).catch(() => {});
-
-  process:
-    name: Process AntigravityCI PR Action
+  antigravity:
+    name: AntigravityCI PR Assistant
     if: ${{ github.event.issue.pull_request && !endsWith(github.actor, '[bot]') && (contains(github.event.comment.body, 'antigravity') || contains(github.event.comment.body, 'AntiGravity') || contains(github.event.comment.body, 'Antigravity')) }}
     runs-on: ubuntu-latest
     permissions:
@@ -150,8 +106,6 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          model: "gemini-3.6-flash"
-          post_ack: "false"
 ```
 
 ---
@@ -191,24 +145,18 @@ sequenceDiagram
     autonumber
     actor Collaborator as Developer (Collaborator/Owner)
     participant GH as GitHub PR Thread
-    participant AckJob as Job 1: Instant Ack (<1.5s)
-    participant EngineJob as Job 2: AI Core Engine
+    participant Action as AntigravityCI Action
     participant Gemini as Google Gemini ♊ (3.6 / 3.7 Flash)
 
     Collaborator->>GH: Comment: "@antigravity refactor optimize loop"
-    par Concurrent Execution
-        GH->>AckJob: issue_comment event
-        AckJob->>GH: React 👍 (+1) in <1.5s
-        AckJob->>GH: Post instant instruction replay comment
-    and
-        GH->>EngineJob: issue_comment event
-        EngineJob->>GH: Fetch modified PR files (excluding lockfiles/binary)
-        EngineJob->>Gemini: Send files context + user instruction
-        Gemini-->>EngineJob: Return structured file modifications & explanation
-        EngineJob->>GH: Git branch & commit refactored files
-        EngineJob->>GH: Open new Pull Request targeting base branch
-        EngineJob->>GH: Request review & post PR link with 🚀 reaction
-    end
+    GH->>Action: issue_comment event
+    Action->>GH: React 👍 (+1) & post instruction replay (<1s)
+    Action->>GH: Fetch modified PR files (excluding lockfiles/binary)
+    Action->>Gemini: Send files context + user instruction
+    Gemini-->>Action: Return structured file modifications & explanation
+    Action->>GH: Git branch & commit refactored files
+    Action->>GH: Open new Pull Request targeting base branch
+    Action->>GH: Request review & post PR link with 🚀 reaction
 ```
 
 ---
